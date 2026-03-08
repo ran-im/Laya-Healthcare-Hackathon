@@ -55,7 +55,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel — Branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12"
+      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12"
         style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
 
         {/* Logo */}

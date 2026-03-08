@@ -100,7 +100,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12" style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
+      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12" style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
