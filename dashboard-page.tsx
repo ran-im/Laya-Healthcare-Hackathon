@@ -136,7 +136,8 @@ export default function DashboardPage() {
       <div className="min-h-screen flex items-center justify-center"
            style={{ background: 'linear-gradient(135deg, #003C3A 0%, #00A89D 100%)' }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full
+                          animate-spin mx-auto mb-4" />
           <p className="text-white/70 text-sm">Loading your dashboard...</p>
         </div>
       </div>
@@ -190,10 +191,12 @@ export default function DashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+                  className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100
+                             hover:text-gray-700 transition-colors">
                   <Bell className="w-5 h-5" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full
+                                     flex items-center justify-center text-white text-xs font-bold"
                           style={{ background: '#E8505B', fontSize: '9px' }}>
                       {unreadNotifications}
                     </span>
@@ -202,7 +205,8 @@ export default function DashboardPage() {
 
                 {/* Notification dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl
+                                  border border-gray-100 overflow-hidden z-50">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                       <span className="font-semibold text-gray-900 text-sm">Notifications</span>
                       {unreadNotifications > 0 && (
@@ -219,7 +223,8 @@ export default function DashboardPage() {
                     ) : (
                       notifications.map((n) => (
                         <div key={n.id}
-                             className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                             className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50
+                                        transition-colors cursor-pointer"
                              style={{ background: n.is_read ? 'white' : '#F2FAF9' }}>
                           <p className="text-sm font-medium text-gray-900">{n.title}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
@@ -232,7 +237,9 @@ export default function DashboardPage() {
               </div>
 
               {/* Profile */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+                              bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100
+                              transition-colors">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
                      style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
                   {profile?.full_name?.[0] || 'M'}
@@ -249,7 +256,8 @@ export default function DashboardPage() {
 
               {/* Logout */}
               <button onClick={handleLogout}
-                      className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      className="p-2 rounded-lg text-gray-400 hover:text-red-500
+                                 hover:bg-red-50 transition-colors">
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
@@ -264,7 +272,7 @@ export default function DashboardPage() {
         <div className="rounded-2xl p-6 mb-8 text-white relative overflow-hidden"
              style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 50%, #00A89D 100%)' }}>
           <div className="relative z-10">
-            <p className="text-white/70 text-sm mb-1">Good day</p>
+            <p className="text-white/70 text-sm mb-1">Good day 👋</p>
             <h1 className="text-2xl font-bold mb-1">
               {profile?.full_name || 'Member'}
             </h1>
@@ -275,15 +283,19 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => router.push('/submit-claim')}
-            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                       text-sm font-semibold transition-all duration-200
+                       hover:shadow-lg hover:-translate-y-0.5"
             style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
             <Plus className="w-4 h-4" />
             Submit New Claim
           </button>
 
           {/* Decorative circle */}
-          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full" style={{ background: 'rgba(0,212,200,0.1)' }} />
-          <div className="absolute -right-4 -bottom-8 w-32 h-32 rounded-full" style={{ background: 'rgba(0,212,200,0.07)' }} />
+          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full"
+               style={{ background: 'rgba(0,212,200,0.1)' }} />
+          <div className="absolute -right-4 -bottom-8 w-32 h-32 rounded-full"
+               style={{ background: 'rgba(0,212,200,0.07)' }} />
         </div>
 
         {/* Stats Grid */}
@@ -335,14 +347,18 @@ export default function DashboardPage() {
 
               {claims.length === 0 ? (
                 <div className="px-6 py-16 text-center">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#F2FAF9' }}>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                       style={{ background: '#F2FAF9' }}>
                     <FileText className="w-7 h-7" style={{ color: '#00A89D' }} />
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-2">No claims yet</h3>
-                  <p className="text-gray-500 text-sm mb-5">Submit your first claim to get started</p>
+                  <p className="text-gray-500 text-sm mb-5">
+                    Submit your first claim to get started
+                  </p>
                   <button
                     onClick={() => router.push('/submit-claim')}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:-translate-y-0.5"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                               text-white text-sm font-semibold transition-all hover:-translate-y-0.5"
                     style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
                     <Plus className="w-4 h-4" />
                     Submit a claim
@@ -354,10 +370,12 @@ export default function DashboardPage() {
                     const sc = statusConfig(claim.status)
                     return (
                       <div key={claim.id}
-                           className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-4"
+                           className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer
+                                      flex items-center gap-4"
                            onClick={() => router.push(`/claims/${claim.id}`)}>
                         {/* Icon */}
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F2FAF9' }}>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                             style={{ background: '#F2FAF9' }}>
                           <Stethoscope className="w-4 h-4" style={{ color: '#00A89D' }} />
                         </div>
 
@@ -384,7 +402,8 @@ export default function DashboardPage() {
                           <div className="font-bold text-gray-900 text-sm mb-1.5">
                             {formatCurrency(claim.total_amount)}
                           </div>
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5
+                                           rounded-full font-medium"
                                 style={{ background: sc.bg, color: sc.color }}>
                             {sc.icon}
                             {claim.status}
@@ -438,8 +457,10 @@ export default function DashboardPage() {
                   },
                 ].map((action) => (
                   <a key={action.label} href={action.href}
-                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50
+                                transition-colors cursor-pointer group">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center
+                                    flex-shrink-0 transition-colors"
                          style={{ background: action.color + '15', color: action.color }}>
                       {action.icon}
                     </div>
@@ -447,7 +468,8 @@ export default function DashboardPage() {
                       <div className="text-sm font-medium text-gray-900">{action.label}</div>
                       <div className="text-xs text-gray-400 truncate">{action.sub}</div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500
+                                             transition-colors flex-shrink-0" />
                   </a>
                 ))}
               </div>
@@ -457,17 +479,23 @@ export default function DashboardPage() {
             <div className="rounded-2xl p-5 text-white relative overflow-hidden"
                  style={{ background: 'linear-gradient(135deg, #003C3A, #005C58)' }}>
               <div className="relative z-10">
-                <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Your Plan</p>
-                <h4 className="font-bold text-lg mb-1">{profile?.plan_name || 'Essential Health'}</h4>
+                <p className="text-white/60 text-xs uppercase tracking-widest mb-1">
+                  Your Plan
+                </p>
+                <h4 className="font-bold text-lg mb-1">
+                  {profile?.plan_name || 'Essential Health'}
+                </h4>
                 <p className="text-white/60 text-xs mb-4">Active · Renews annually</p>
                 <a href="/benefit-check"
-                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                   className="inline-flex items-center gap-1.5 text-xs font-semibold
+                              px-3 py-1.5 rounded-lg transition-colors"
                    style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>
                   <Eye className="w-3.5 h-3.5" />
                   Check coverage
                 </a>
               </div>
-              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full" style={{ background: 'rgba(0,212,200,0.12)' }} />
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full"
+                   style={{ background: 'rgba(0,212,200,0.12)' }} />
             </div>
 
           </div>
