@@ -1,35 +1,47 @@
-@import "tailwindcss";
-
-@theme inline {
-  --color-laya-dark: #003C3A;
-  --color-laya-mid: #005C58;
-  --color-laya-teal: #00A89D;
-  --color-laya-accent: #00D4C8;
-  --color-laya-warm: #F2FAF9;
-  --color-laya-gold: #E8A020;
-  --color-laya-rose: #E8505B;
-  --color-laya-slate: #2D3E3D;
-  
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --laya-dark: #003C3A;
+  --laya-mid: #005C58;
+  --laya-teal: #00A89D;
+  --laya-accent: #00D4C8;
+  --laya-warm: #F2FAF9;
+  --laya-gold: #E8A020;
+  --laya-rose: #E8505B;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.laya-gradient {
+  background: linear-gradient(135deg, #003C3A 0%, #005C58 50%, #00A89D 100%);
+}
+
+.card-hover {
+  transition: all 200ms;
+}
+.card-hover:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-width: 1px;
 }
