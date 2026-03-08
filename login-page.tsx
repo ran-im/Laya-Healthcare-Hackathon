@@ -32,6 +32,7 @@ export default function LoginPage() {
       }
 
       if (data.user) {
+        // Get user role from profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
@@ -40,6 +41,7 @@ export default function LoginPage() {
 
         const role = profile?.role || 'member'
 
+        // Route based on role
         if (role === 'assessor') router.push('/assessor-dashboard')
         else if (role === 'admin') router.push('/analytics')
         else if (role === 'fraud') router.push('/assessor-dashboard')
@@ -60,7 +62,8 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20
+                          flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -110,7 +113,8 @@ export default function LoginPage() {
 
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#003C3A' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: '#003C3A' }}>
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -130,7 +134,8 @@ export default function LoginPage() {
 
           {/* Error */}
           {error && (
-            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200
+                            rounded-xl text-red-700 text-sm">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -140,22 +145,36 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email address
+              </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white
+                           text-gray-900 placeholder-gray-400 text-sm
+                           focus:outline-none focus:ring-2 focus:border-transparent
+                           transition-all duration-200"
+                style={{ '--tw-ring-color': '#00A89D' } as React.CSSProperties}
+                onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #00A89D40'}
+                onBlur={(e) => e.target.style.boxShadow = 'none'}
               />
             </div>
 
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
-                <a href="/forgot-password" className="text-xs font-medium text-teal-600">Forgot password?</a>
+                <label className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <a href="/forgot-password"
+                   className="text-xs font-medium"
+                   style={{ color: '#00A89D' }}>
+                  Forgot password?
+                </a>
               </div>
               <div className="relative">
                 <input
@@ -164,14 +183,21 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 bg-white
+                             text-gray-900 placeholder-gray-400 text-sm
+                             focus:outline-none transition-all duration-200"
+                  onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #00A89D40'}
+                  onBlur={(e) => e.target.style.boxShadow = 'none'}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400
+                             hover:text-gray-600 transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -180,8 +206,12 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}
+              className="w-full py-3 px-4 rounded-xl text-white font-semibold text-sm
+                         transition-all duration-200 flex items-center justify-center gap-2
+                         disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: loading ? '#00A89D99' : 'linear-gradient(135deg, #003C3A, #00A89D)' }}
+              onMouseEnter={(e) => !loading && ((e.target as HTMLElement).style.opacity = '0.92')}
+              onMouseLeave={(e) => !loading && ((e.target as HTMLElement).style.opacity = '1')}
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Signing in...' : 'Sign in'}
@@ -198,23 +228,40 @@ export default function LoginPage() {
           {/* Register */}
           <p className="text-center text-sm text-gray-500">
             New to Laya Healthcare?{' '}
-            <a href="/register" className="font-semibold text-teal-600">Create an account</a>
+            <a href="/register"
+               className="font-semibold"
+               style={{ color: '#00A89D' }}>
+              Create an account
+            </a>
           </p>
 
-          {/* Demo credentials */}
+          {/* Demo credentials hint */}
           <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-xs font-semibold text-blue-700 mb-2">Demo accounts:</p>
-            <div className="space-y-1 text-xs text-blue-600">
-              <div>Member: member@laya-demo.com</div>
-              <div>Assessor: assessor@laya-demo.com</div>
-              <div>Admin: admin@laya-demo.com</div>
-              <div className="text-blue-500 mt-1">Password: Demo1234!</div>
+            <p className="text-xs font-semibold text-blue-700 mb-2">
+              Demo accounts (after setup):
+            </p>
+            <div className="space-y-1">
+              {[
+                { role: 'Member', email: 'member@laya-demo.com' },
+                { role: 'Assessor', email: 'assessor@laya-demo.com' },
+                { role: 'Admin', email: 'admin@laya-demo.com' },
+              ].map((d) => (
+                <div key={d.role} className="flex justify-between text-xs text-blue-600">
+                  <span className="font-medium">{d.role}:</span>
+                  <span className="font-mono">{d.email}</span>
+                </div>
+              ))}
+              <p className="text-xs text-blue-500 mt-1">Password: <span className="font-mono">Demo1234!</span></p>
             </div>
           </div>
         </div>
 
-        <p className="mt-10 text-xs text-gray-400 text-center">
-          By signing in, you agree to our Terms of Service and Privacy Policy.
+        {/* Footer */}
+        <p className="mt-10 text-xs text-gray-400 text-center max-w-sm">
+          By signing in, you agree to our{' '}
+          <a href="/terms" className="underline">Terms of Service</a> and{' '}
+          <a href="/privacy" className="underline">Privacy Policy</a>.
+          Protected under GDPR.
         </p>
       </div>
     </div>
