@@ -10,80 +10,40 @@ import {
   Stethoscope, Eye
 } from 'lucide-react'
 
-// ── Types ──────────────────────────────────────────────
 interface Profile {
-  id: string
-  full_name: string
-  email: string
-  member_id: string
-  plan_name: string
-  role: string
+  id: string; full_name: string; email: string
+  member_id: string; plan_name: string; role: string
 }
-
 interface Claim {
-  id: string
-  claim_id: string
-  claim_type: string
-  status: string
-  provider_name: string
-  total_amount: number
-  currency: string
-  service_date: string
-  created_at: string
+  id: string; claim_id: string; claim_type: string; status: string
+  provider_name: string; total_amount: number; currency: string
+  service_date: string; created_at: string
 }
-
 interface Notification {
-  id: string
-  title: string
-  message: string
-  type: string
-  is_read: boolean
-  created_at: string
+  id: string; title: string; message: string
+  type: string; is_read: boolean; created_at: string
 }
 
-// ── Helpers ────────────────────────────────────────────
-function statusConfig(status: string) {
-  const map: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
-    'Submitted':     { color: '#2563EB', bg: '#EFF6FF', icon: <Clock className="w-3.5 h-3.5" /> },
-    'In Review':     { color: '#D97706', bg: '#FFFBEB', icon: <Activity className="w-3.5 h-3.5" /> },
-    'Approved':      { color: '#059669', bg: '#ECFDF5', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-    'Paid':          { color: '#00A89D', bg: '#F2FAF9', icon: <CreditCard className="w-3.5 h-3.5" /> },
-    'Rejected':      { color: '#DC2626', bg: '#FEF2F2', icon: <XCircle className="w-3.5 h-3.5" /> },
-    'Info Required': { color: '#EA580C', bg: '#FFF7ED', icon: <AlertCircle className="w-3.5 h-3.5" /> },
+function statusStyle(status: string) {
+  const map: Record<string, { color: string; bg: string }> = {
+    'Submitted':     { color: '#2563EB', bg: '#EFF6FF' },
+    'In Review':     { color: '#D97706', bg: '#FFFBEB' },
+    'Approved':      { color: '#059669', bg: '#ECFDF5' },
+    'Paid':          { color: '#00A89D', bg: '#F2FAF9' },
+    'Rejected':      { color: '#DC2626', bg: '#FEF2F2' },
+    'Info Required': { color: '#EA580C', bg: '#FFF7ED' },
   }
-  return map[status] || { color: '#6B7280', bg: '#F9FAFB', icon: <Clock className="w-3.5 h-3.5" /> }
+  return map[status] || { color: '#6B7280', bg: '#F9FAFB' }
 }
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function formatCurrency(amount: number) {
+function fmt(amount: number) {
   return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(amount)
 }
 
-// ── Stat Card ──────────────────────────────────────────
-function StatCard({
-  label, value, sub, icon, color
-}: {
-  label: string; value: string | number; sub?: string
-  icon: React.ReactNode; color: string
-}) {
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-2.5 rounded-xl" style={{ background: color + '18' }}>
-          <div style={{ color }}>{icon}</div>
-        </div>
-      </div>
-      <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
-      <div className="text-sm font-medium text-gray-500">{label}</div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
-    </div>
-  )
-}
-
-// ── Main Component ──────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -92,31 +52,25 @@ export default function DashboardPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
-  const [showNotifications, setShowNotifications] = useState(false)
+  const [showNotif, setShowNotif] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-
-      const [profileRes, claimsRes, notifRes] = await Promise.all([
+      const [p, c, n] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('claims').select('*').eq('member_id', user.id)
-          .order('created_at', { ascending: false }).limit(10),
+          .order('created_at', { ascending: false }).limit(8),
         supabase.from('notifications').select('*').eq('user_id', user.id)
           .order('created_at', { ascending: false }).limit(5),
       ])
-
-      if (profileRes.data) setProfile(profileRes.data)
-      if (claimsRes.data) setClaims(claimsRes.data)
-      if (notifRes.data) setNotifications(notifRes.data)
-    } finally {
-      setLoading(false)
-    }
+      if (p.data) setProfile(p.data)
+      if (c.data) setClaims(c.data)
+      if (n.data) setNotifications(n.data)
+    } finally { setLoading(false) }
   }
 
   async function handleLogout() {
@@ -124,355 +78,209 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
-  // Computed stats
-  const totalClaims = claims.length
-  const pendingClaims = claims.filter(c => ['Submitted','In Review'].includes(c.status)).length
+  const totalClaims    = claims.length
+  const pendingClaims  = claims.filter(c => ['Submitted','In Review'].includes(c.status)).length
   const approvedClaims = claims.filter(c => ['Approved','Paid'].includes(c.status)).length
-  const totalPaid = claims.filter(c => c.status === 'Paid').reduce((s, c) => s + c.total_amount, 0)
-  const unreadNotifications = notifications.filter(n => !n.is_read).length
+  const totalPaid      = claims.filter(c => c.status === 'Paid').reduce((s, c) => s + c.total_amount, 0)
+  const unread         = notifications.filter(n => !n.is_read).length
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center"
-           style={{ background: 'linear-gradient(135deg, #003C3A 0%, #00A89D 100%)' }}>
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/70 text-sm">Loading your dashboard...</p>
-        </div>
+  if (loading) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#003C3A,#00A89D)', fontFamily:'Inter,system-ui,sans-serif' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:'44px', height:'44px', border:'3px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }} />
+        <p style={{ color:'rgba(255,255,255,0.7)', fontSize:'14px' }}>Loading your dashboard...</p>
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight:'100vh', background:'#F8FAFB', fontFamily:'Inter,system-ui,sans-serif' }}>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}} * { box-sizing: border-box; } a { text-decoration: none; }`}</style>
 
-      {/* ── Top Navigation ── */}
-      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      <nav style={{ background:'white', borderBottom:'1px solid #F3F4F6', position:'sticky', top:0, zIndex:100, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ maxWidth:'1280px', margin:'0 auto', padding:'0 24px', display:'flex', alignItems:'center', height:'64px', gap:'8px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginRight:'16px' }}>
+            <div style={{ width:'36px', height:'36px', borderRadius:'10px', flexShrink:0, background:'linear-gradient(135deg,#003C3A,#00A89D)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Shield size={16} color="white" />
+            </div>
+            <div>
+              <div style={{ fontWeight:700, fontSize:'14px', color:'#111827', lineHeight:1 }}>laya</div>
+              <div style={{ color:'#9CA3AF', fontSize:'9px', letterSpacing:'2px', textTransform:'uppercase', marginTop:'2px' }}>healthcare</div>
+            </div>
+          </div>
 
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                   style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <div className="font-bold text-gray-900 text-sm leading-none">laya</div>
-                <div className="text-gray-400 text-xs tracking-widest uppercase leading-none mt-0.5">
-                  healthcare
+          {[
+            { label:'Dashboard',    href:'/dashboard',    active:true },
+            { label:'My Claims',    href:'/claims' },
+            { label:'Submit Claim', href:'/submit-claim' },
+            { label:'Benefit Check',href:'/benefit-check' },
+          ].map(item => (
+            <a key={item.label} href={item.href} style={{ padding:'7px 14px', borderRadius:'8px', fontSize:'13px', fontWeight:500, color: item.active ? '#00A89D' : '#6B7280', background: item.active ? '#F2FAF9' : 'transparent', transition:'all 0.15s' }}>{item.label}</a>
+          ))}
+
+          <div style={{ flex:1 }} />
+
+          <div style={{ position:'relative' }}>
+            <button onClick={() => setShowNotif(!showNotif)} style={{ position:'relative', padding:'8px', borderRadius:'10px', background:'none', border:'1px solid #E5E7EB', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#6B7280' }}>
+              <Bell size={17} />
+              {unread > 0 && (
+                <span style={{ position:'absolute', top:'-4px', right:'-4px', width:'18px', height:'18px', borderRadius:'50%', background:'#E8505B', color:'white', fontSize:'10px', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid white' }}>{unread}</span>
+              )}
+            </button>
+
+            {showNotif && (
+              <div style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:'320px', background:'white', borderRadius:'16px', border:'1px solid #F3F4F6', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', overflow:'hidden', zIndex:200 }}>
+                <div style={{ padding:'14px 16px', borderBottom:'1px solid #F3F4F6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontWeight:600, fontSize:'14px', color:'#111827' }}>Notifications</span>
+                  {unread > 0 && <span style={{ fontSize:'11px', padding:'2px 8px', borderRadius:'999px', background:'#FEF2F2', color:'#DC2626', fontWeight:600 }}>{unread} new</span>}
                 </div>
+                {notifications.length === 0
+                  ? <p style={{ padding:'24px', textAlign:'center', color:'#9CA3AF', fontSize:'13px' }}>No notifications yet</p>
+                  : notifications.map(n => (
+                    <div key={n.id} style={{ padding:'12px 16px', borderBottom:'1px solid #F9FAFB', cursor:'pointer', background: n.is_read ? 'white' : '#F2FAF9' }}>
+                      <p style={{ fontSize:'13px', fontWeight:600, color:'#111827', margin:'0 0 2px 0' }}>{n.title}</p>
+                      <p style={{ fontSize:'12px', color:'#6B7280', margin:'0 0 4px 0' }}>{n.message}</p>
+                      <p style={{ fontSize:'11px', color:'#9CA3AF', margin:0 }}>{formatDate(n.created_at)}</p>
+                    </div>
+                  ))
+                }
               </div>
+            )}
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 12px', background:'#F9FAFB', border:'1px solid #E5E7EB', borderRadius:'10px' }}>
+            <div style={{ width:'28px', height:'28px', borderRadius:'50%', flexShrink:0, background:'linear-gradient(135deg,#003C3A,#00A89D)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'12px', fontWeight:700 }}>
+              {profile?.full_name?.[0] || 'M'}
+            </div>
+            <div>
+              <div style={{ fontSize:'12px', fontWeight:600, color:'#111827', lineHeight:1 }}>{profile?.full_name || 'Member'}</div>
+              <div style={{ fontSize:'10px', color:'#9CA3AF', marginTop:'2px', fontFamily:'monospace' }}>{profile?.member_id || ''}</div>
+            </div>
+          </div>
+
+          <button onClick={handleLogout} style={{ padding:'8px', borderRadius:'10px', background:'none', border:'1px solid #E5E7EB', cursor:'pointer', color:'#9CA3AF', display:'flex', alignItems:'center' }}>
+            <LogOut size={15} />
+          </button>
+        </div>
+      </nav>
+
+      <div style={{ background:'linear-gradient(135deg,#003C3A 0%,#005C58 55%,#00A89D 100%)', padding:'32px 24px', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', right:'-60px', top:'-60px', width:'280px', height:'280px', borderRadius:'50%', background:'rgba(0,212,200,0.08)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', right:'80px', bottom:'-40px', width:'160px', height:'160px', borderRadius:'50%', background:'rgba(0,212,200,0.06)', pointerEvents:'none' }} />
+
+        <div style={{ maxWidth:'1280px', margin:'0 auto', position:'relative' }}>
+          <p style={{ color:'rgba(255,255,255,0.65)', fontSize:'14px', margin:'0 0 6px 0' }}>Good day</p>
+          <h1 style={{ color:'white', fontSize:'28px', fontWeight:700, margin:'0 0 6px 0', lineHeight:1.2 }}>{profile?.full_name || 'Member'}</h1>
+          <p style={{ color:'rgba(255,255,255,0.55)', fontSize:'14px', margin:'0 0 20px 0' }}>
+            {profile?.plan_name || 'Essential Health'} · Member ID:{' '}
+            <span style={{ fontFamily:'monospace', color:'rgba(255,255,255,0.85)' }}>{profile?.member_id || '—'}</span>
+          </p>
+          <button onClick={() => router.push('/submit-claim')} style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'10px 22px', background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:'12px', color:'white', fontSize:'14px', fontWeight:600, cursor:'pointer' }}>
+            <Plus size={15} /> Submit New Claim
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:'1280px', margin:'0 auto', padding:'28px 24px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'28px' }}>
+          {[
+            { label:'Total Claims',  value: totalClaims,       sub:'All time',           icon:<FileText size={20}/>,    color:'#2563EB' },
+            { label:'Pending',       value: pendingClaims,      sub:'Awaiting decision',  icon:<Clock size={20}/>,       color:'#D97706' },
+            { label:'Approved',      value: approvedClaims,     sub:'Successful claims',  icon:<CheckCircle2 size={20}/>,color:'#059669' },
+            { label:'Total Paid',    value: fmt(totalPaid),     sub:'Reimbursed to you',  icon:<TrendingUp size={20}/>,  color:'#00A89D' },
+          ].map(stat => (
+            <div key={stat.label} style={{ background:'white', borderRadius:'16px', padding:'22px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ width:'42px', height:'42px', borderRadius:'12px', marginBottom:'16px', display:'flex', alignItems:'center', justifyContent:'center', background: stat.color + '15', color: stat.color }}>{stat.icon}</div>
+              <div style={{ fontSize:'26px', fontWeight:700, color:'#111827', marginBottom:'4px' }}>{stat.value}</div>
+              <div style={{ fontSize:'13px', fontWeight:500, color:'#6B7280' }}>{stat.label}</div>
+              <div style={{ fontSize:'11px', color:'#9CA3AF', marginTop:'2px' }}>{stat.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:'20px' }}>
+          <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)', overflow:'hidden' }}>
+            <div style={{ padding:'18px 20px', borderBottom:'1px solid #F9FAFB', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <h2 style={{ fontSize:'15px', fontWeight:600, color:'#111827', margin:0 }}>Recent Claims</h2>
+              <a href="/claims" style={{ fontSize:'13px', fontWeight:500, color:'#00A89D', display:'flex', alignItems:'center', gap:'4px' }}>View all <ChevronRight size={14} /></a>
             </div>
 
-            {/* Nav Links */}
-            <div className="hidden md:flex items-center gap-1">
+            {claims.length === 0 ? (
+              <div style={{ padding:'60px 20px', textAlign:'center' }}>
+                <div style={{ width:'56px', height:'56px', borderRadius:'16px', background:'#F2FAF9', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+                  <FileText size={24} color="#00A89D" />
+                </div>
+                <h3 style={{ fontSize:'15px', fontWeight:600, color:'#111827', margin:'0 0 8px 0' }}>No claims yet</h3>
+                <p style={{ color:'#6B7280', fontSize:'13px', margin:'0 0 20px 0' }}>Submit your first claim to get started</p>
+                <button onClick={() => router.push('/submit-claim')} style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'10px 20px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg,#003C3A,#00A89D)', color:'white', fontSize:'13px', fontWeight:600 }}>
+                  <Plus size={14} /> Submit a claim
+                </button>
+              </div>
+            ) : (
+              claims.map((claim, i) => {
+                const sc = statusStyle(claim.status)
+                return (
+                  <div key={claim.id} onClick={() => router.push(`/claims/${claim.id}`)} style={{ display:'flex', alignItems:'center', gap:'14px', padding:'14px 20px', cursor:'pointer', transition:'background 0.15s', borderBottom: i < claims.length - 1 ? '1px solid #F9FAFB' : 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')} onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                    <div style={{ width:'38px', height:'38px', borderRadius:'10px', flexShrink:0, background:'#F2FAF9', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <Stethoscope size={16} color="#00A89D" />
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'3px' }}>
+                        <span style={{ fontWeight:600, fontSize:'13px', color:'#111827', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{claim.provider_name}</span>
+                        <span style={{ fontSize:'11px', padding:'2px 8px', borderRadius:'999px', background:'#F2FAF9', color:'#00A89D', fontWeight:500, flexShrink:0 }}>{claim.claim_type}</span>
+                      </div>
+                      <div style={{ display:'flex', gap:'10px', fontSize:'11px', color:'#9CA3AF' }}>
+                        <span style={{ fontFamily:'monospace' }}>{claim.claim_id}</span>
+                        <span>·</span>
+                        <span>{formatDate(claim.service_date)}</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ fontWeight:700, fontSize:'13px', color:'#111827', marginBottom:'5px' }}>{fmt(claim.total_amount)}</div>
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:500, padding:'3px 8px', borderRadius:'999px', background: sc.bg, color: sc.color }}>{claim.status}</span>
+                    </div>
+                    <ChevronRight size={15} color="#E5E7EB" />
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+            <div style={{ background:'white', borderRadius:'16px', padding:'18px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 14px 0' }}>Quick Actions</h3>
               {[
-                { label: 'Dashboard', href: '/dashboard', active: true },
-                { label: 'My Claims', href: '/claims' },
-                { label: 'Submit Claim', href: '/submit-claim' },
-                { label: 'Benefit Check', href: '/benefit-check' },
-              ].map((item) => (
-                <a key={item.label} href={item.href}
-                   className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                   style={{
-                     background: item.active ? '#F2FAF9' : 'transparent',
-                     color: item.active ? '#00A89D' : '#6B7280',
-                   }}>
-                  {item.label}
+                { icon:<Plus size={15}/>,     label:'Submit a Claim',   sub:'Upload receipts',        href:'/submit-claim',   color:'#00A89D' },
+                { icon:<Eye size={15}/>,      label:'Check Benefits',   sub:'Is my treatment covered?',href:'/benefit-check',  color:'#2563EB' },
+                { icon:<FileText size={15}/>, label:'View All Claims',  sub:'Full claims history',    href:'/claims',         color:'#7C3AED' },
+                { icon:<User size={15}/>,     label:'My Profile',       sub:'Update bank details',    href:'/profile',        color:'#D97706' },
+              ].map(action => (
+                <a key={action.label} href={action.href} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 8px', borderRadius:'10px', cursor:'pointer', transition:'background 0.15s', textDecoration:'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div style={{ width:'34px', height:'34px', borderRadius:'10px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background: action.color + '15', color: action.color }}>{action.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:'13px', fontWeight:500, color:'#111827' }}>{action.label}</div>
+                    <div style={{ fontSize:'11px', color:'#9CA3AF' }}>{action.sub}</div>
+                  </div>
+                  <ChevronRight size={14} color="#D1D5DB" />
                 </a>
               ))}
             </div>
 
-            {/* Right side */}
-            <div className="flex items-center gap-3">
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
-                  <Bell className="w-5 h-5" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ background: '#E8505B', fontSize: '9px' }}>
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </button>
-
-                {/* Notification dropdown */}
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                      <span className="font-semibold text-gray-900 text-sm">Notifications</span>
-                      {unreadNotifications > 0 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                              style={{ background: '#FEF2F2', color: '#DC2626' }}>
-                          {unreadNotifications} new
-                        </span>
-                      )}
-                    </div>
-                    {notifications.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                        No notifications yet
-                      </div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div key={n.id}
-                             className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
-                             style={{ background: n.is_read ? 'white' : '#F2FAF9' }}>
-                          <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">{formatDate(n.created_at)}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Profile */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                     style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-                  {profile?.full_name?.[0] || 'M'}
-                </div>
-                <div className="hidden sm:block">
-                  <div className="text-xs font-semibold text-gray-900 leading-none">
-                    {profile?.full_name || 'Member'}
-                  </div>
-                  <div className="text-xs text-gray-400 leading-none mt-0.5">
-                    {profile?.member_id || ''}
-                  </div>
-                </div>
-              </div>
-
-              {/* Logout */}
-              <button onClick={handleLogout}
-                      className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* ── Main Content ── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {/* Welcome Banner */}
-        <div className="rounded-2xl p-6 mb-8 text-white relative overflow-hidden"
-             style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 50%, #00A89D 100%)' }}>
-          <div className="relative z-10">
-            <p className="text-white/70 text-sm mb-1">Good day</p>
-            <h1 className="text-2xl font-bold mb-1">
-              {profile?.full_name || 'Member'}
-            </h1>
-            <p className="text-white/60 text-sm">
-              {profile?.plan_name || 'Essential Health'} · Member ID:{' '}
-              <span className="font-mono text-white/90">{profile?.member_id || '—'}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => router.push('/submit-claim')}
-            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
-            style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
-            <Plus className="w-4 h-4" />
-            Submit New Claim
-          </button>
-
-          {/* Decorative circle */}
-          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full" style={{ background: 'rgba(0,212,200,0.1)' }} />
-          <div className="absolute -right-4 -bottom-8 w-32 h-32 rounded-full" style={{ background: 'rgba(0,212,200,0.07)' }} />
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            label="Total Claims"
-            value={totalClaims}
-            sub="All time"
-            icon={<FileText className="w-5 h-5" />}
-            color="#2563EB"
-          />
-          <StatCard
-            label="Pending"
-            value={pendingClaims}
-            sub="Awaiting decision"
-            icon={<Clock className="w-5 h-5" />}
-            color="#D97706"
-          />
-          <StatCard
-            label="Approved"
-            value={approvedClaims}
-            sub="Successful claims"
-            icon={<CheckCircle2 className="w-5 h-5" />}
-            color="#059669"
-          />
-          <StatCard
-            label="Total Paid"
-            value={formatCurrency(totalPaid)}
-            sub="Reimbursed to you"
-            icon={<TrendingUp className="w-5 h-5" />}
-            color="#00A89D"
-          />
-        </div>
-
-        {/* Two column layout */}
-        <div className="grid lg:grid-cols-3 gap-6">
-
-          {/* Claims Table — 2/3 width */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">Recent Claims</h2>
-                <a href="/claims"
-                   className="text-sm font-medium flex items-center gap-1 transition-colors hover:opacity-80"
-                   style={{ color: '#00A89D' }}>
-                  View all <ChevronRight className="w-4 h-4" />
+            <div style={{ borderRadius:'16px', padding:'20px', color:'white', position:'relative', overflow:'hidden', background:'linear-gradient(135deg,#003C3A 0%,#005C58 100%)' }}>
+              <div style={{ position:'absolute', bottom:'-24px', right:'-24px', width:'100px', height:'100px', borderRadius:'50%', background:'rgba(0,212,200,0.12)', pointerEvents:'none' }} />
+              <div style={{ position:'relative' }}>
+                <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'10px', letterSpacing:'2px', textTransform:'uppercase', margin:'0 0 6px 0' }}>Your Plan</p>
+                <h4 style={{ color:'white', fontWeight:700, fontSize:'18px', margin:'0 0 4px 0' }}>{profile?.plan_name || 'Essential Health'}</h4>
+                <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 16px 0' }}>Active · Renews annually</p>
+                <a href="/benefit-check" style={{ display:'inline-flex', alignItems:'center', gap:'6px', padding:'7px 14px', background:'rgba(255,255,255,0.14)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'10px', color:'white', fontSize:'12px', fontWeight:600, textDecoration:'none' }}>
+                  <Eye size={13} /> Check coverage
                 </a>
               </div>
-
-              {claims.length === 0 ? (
-                <div className="px-6 py-16 text-center">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#F2FAF9' }}>
-                    <FileText className="w-7 h-7" style={{ color: '#00A89D' }} />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">No claims yet</h3>
-                  <p className="text-gray-500 text-sm mb-5">Submit your first claim to get started</p>
-                  <button
-                    onClick={() => router.push('/submit-claim')}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:-translate-y-0.5"
-                    style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-                    <Plus className="w-4 h-4" />
-                    Submit a claim
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {claims.map((claim) => {
-                    const sc = statusConfig(claim.status)
-                    return (
-                      <div key={claim.id}
-                           className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-4"
-                           onClick={() => router.push(`/claims/${claim.id}`)}>
-                        {/* Icon */}
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F2FAF9' }}>
-                          <Stethoscope className="w-4 h-4" style={{ color: '#00A89D' }} />
-                        </div>
-
-                        {/* Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-gray-900 text-sm truncate">
-                              {claim.provider_name}
-                            </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                                  style={{ background: '#F2FAF9', color: '#00A89D' }}>
-                              {claim.claim_type}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-400">
-                            <span className="font-mono">{claim.claim_id}</span>
-                            <span>·</span>
-                            <span>{formatDate(claim.service_date)}</span>
-                          </div>
-                        </div>
-
-                        {/* Amount + Status */}
-                        <div className="text-right flex-shrink-0">
-                          <div className="font-bold text-gray-900 text-sm mb-1.5">
-                            {formatCurrency(claim.total_amount)}
-                          </div>
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                                style={{ background: sc.bg, color: sc.color }}>
-                            {sc.icon}
-                            {claim.status}
-                          </span>
-                        </div>
-
-                        <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
-          </div>
-
-          {/* Right Sidebar — 1/3 */}
-          <div className="space-y-5">
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-2">
-                {[
-                  {
-                    icon: <Plus className="w-4 h-4" />,
-                    label: 'Submit a Claim',
-                    sub: 'Upload receipts & invoices',
-                    href: '/submit-claim',
-                    color: '#00A89D',
-                  },
-                  {
-                    icon: <Eye className="w-4 h-4" />,
-                    label: 'Check Benefits',
-                    sub: 'Is my treatment covered?',
-                    href: '/benefit-check',
-                    color: '#2563EB',
-                  },
-                  {
-                    icon: <FileText className="w-4 h-4" />,
-                    label: 'View All Claims',
-                    sub: 'Full claims history',
-                    href: '/claims',
-                    color: '#7C3AED',
-                  },
-                  {
-                    icon: <User className="w-4 h-4" />,
-                    label: 'My Profile',
-                    sub: 'Update details & bank info',
-                    href: '/profile',
-                    color: '#D97706',
-                  },
-                ].map((action) => (
-                  <a key={action.label} href={action.href}
-                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
-                         style={{ background: action.color + '15', color: action.color }}>
-                      {action.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900">{action.label}</div>
-                      <div className="text-xs text-gray-400 truncate">{action.sub}</div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {/* Plan Info Card */}
-            <div className="rounded-2xl p-5 text-white relative overflow-hidden"
-                 style={{ background: 'linear-gradient(135deg, #003C3A, #005C58)' }}>
-              <div className="relative z-10">
-                <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Your Plan</p>
-                <h4 className="font-bold text-lg mb-1">{profile?.plan_name || 'Essential Health'}</h4>
-                <p className="text-white/60 text-xs mb-4">Active · Renews annually</p>
-                <a href="/benefit-check"
-                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                   style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>
-                  <Eye className="w-3.5 h-3.5" />
-                  Check coverage
-                </a>
-              </div>
-              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full" style={{ background: 'rgba(0,212,200,0.12)' }} />
-            </div>
-
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
