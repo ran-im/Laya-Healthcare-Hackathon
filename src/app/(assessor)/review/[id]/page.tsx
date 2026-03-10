@@ -114,11 +114,18 @@ export default function AIReviewPage() {
     if (!claim) return
     setGenerating(true)
     try {
+    console.log('Calling /api/ai/summarize...')
       const response = await fetch('/api/ai/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claimId: claim.id }),
       })
+      console.log('Response status:', response.status)
+      if (!response.ok) {
+        const text = await response.text()
+        console.log('Error body:', text)
+        throw new Error(`HTTP ${response.status}: ${text}`)
+      }
       const data = await response.json()
       if (data.summary) {
         setChat(prev => [...prev, {
@@ -587,7 +594,7 @@ export default function AIReviewPage() {
                   Laya AI Assistant
                 </div>
                 <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.5)', marginTop:'2px' }}>
-                  Powered by GPT-4 · Claims Intelligence
+                  Powered by Claude · Claims Intelligence
                 </div>
               </div>
               <button onClick={generateSummary} disabled={generating}
