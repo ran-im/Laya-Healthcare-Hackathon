@@ -1,23 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { claim_type, provider_type, estimated_amount } = body
-
-    const mockResult = {
-      is_covered: true,
-      coverage_percentage: 80,
-      estimated_payout: estimated_amount * 0.8,
-      required_documents: ['Invoice', 'Medical Report', 'ID Proof'],
-      notes: 'Standard coverage applies for this claim type',
-      plan_limit: 5000,
-      used_amount: 2500,
-      remaining: 2500,
-    }
-
-    return NextResponse.json(mockResult)
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to check benefits' }, { status: 500 })
-  }
+export async function POST(request: Request) {
+  const { query } = await request.json()
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 300,
+    system: `You are a Laya Healthcare benefits advisor for Ireland. Answer questions about what is covered under the Premium Health plan. Be concise, friendly, and specific about coverage limits. Always end with "Call 1890 700 890 for full details."`,
+    messages: [{ role: 'user', content: query }]
+  })
+  const answer = message.content[0].type === 'text' ? message.content[0].text : 'Please call 1890 700 890.'
+  return NextResponse.json({ answer })
 }
