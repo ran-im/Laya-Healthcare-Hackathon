@@ -528,21 +528,18 @@ export default function SubmitClaimPage() {
                   <AlertCircle className="w-4 h-4" /> {errors.claimType}
                 </p>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+              <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'24px'}}>
                 {CLAIM_TYPES.map((ct) => {
                   const selected = form.claimType === ct.value
                   return (
                     <button key={ct.value} type="button"
                             onClick={() => update('claimType', ct.value)}
-                            className={`p-4 rounded-xl border-2 text-left transition-all duration-200
-                                        hover:-translate-y-0.5 ${
-                              selected
-                                ? 'border-teal-400 shadow-md'
-                                : 'border-gray-100 hover:border-gray-200'
-                            }`}
-                            style={selected
-                              ? { background: '#F2FAF9' }
-                              : { background: 'white' }}>
+                            style={{
+                              padding:'16px', borderRadius:'12px', textAlign:'left', cursor:'pointer',
+                              border: selected ? '2px solid #00A89D' : '2px solid #F3F4F6',
+                              background: selected ? '#F2FAF9' : 'white',
+                              transition:'all 0.15s', boxShadow: selected ? '0 4px 12px rgba(0,168,157,0.15)' : 'none'
+                            }}>
                       <div className="mb-2" style={{ color: selected ? '#00A89D' : '#9CA3AF' }}>
                         {ct.icon}
                       </div>
