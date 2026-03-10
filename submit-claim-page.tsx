@@ -50,8 +50,8 @@ function StepIndicator({ current, steps }: { current: number; steps: string[] })
             <div className="flex flex-col items-center">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center
                                text-sm font-bold transition-all duration-300 ${
-                 done   ? 'text-white' :
-                 active ? 'text-white' : 'text-gray-400 bg-gray-100'}`}
+                done   ? 'text-white' :
+                active ? 'text-white' : 'text-gray-400 bg-gray-100'}`}
                 style={{
                   background: done ? '#00A89D' : active
                     ? 'linear-gradient(135deg,#003C3A,#00A89D)' : undefined,
