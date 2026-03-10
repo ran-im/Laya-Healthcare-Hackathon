@@ -230,8 +230,8 @@ export default function AIReviewPage() {
     </div>
   )
 
-  const fs = scoreColor(claim.fraud_score ?? 0)
-  const cs = scoreColor(claim.complexity_score ?? 0)
+  const fs = scoreColor(Math.round((claim.fraud_score ?? 0) * 100))
+  const cs = scoreColor(Math.round((claim.complexity_score ?? 0) * 100))
 
   return (
     <div style={{ minHeight:'100vh', background:'#F8FAFB', fontFamily:'Inter,system-ui,sans-serif' }}>
@@ -381,10 +381,10 @@ export default function AIReviewPage() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px' }}>
               {[
-                { label:'Fraud Score',      value: claim.fraud_score ?? 0,      style: fs },
-                { label:'Complexity Score', value: claim.complexity_score ?? 0,  style: cs },
-                { label:'Anomaly Score',    value: claim.anomaly_score ?? 0,
-                  style: scoreColor(claim.anomaly_score ?? 0) },
+                { label:'Fraud Score',      value: Math.round((claim.fraud_score ?? 0) * 100),      style: fs },
+                { label:'Complexity Score', value: Math.round((claim.complexity_score ?? 0) * 100),  style: cs },
+                { label:'Anomaly Score',    value: Math.round((claim.anomaly_score ?? 0) * 100),
+                  style: scoreColor(Math.round((claim.anomaly_score ?? 0) * 100)) },
               ].map(score => (
                 <div key={score.label} style={{ padding:'16px', borderRadius:'12px',
                                                 background: score.style.bg, textAlign:'center' }}>
