@@ -7,19 +7,31 @@ export async function POST(request: Request) {
     const { claimId } = await request.json()
     if (!claimId) return NextResponse.json({ error: 'claimId required' }, { status: 400 })
 
+    console.log('Looking up claim:', claimId)
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { data: claim, error } = await supabaseAdmin
+    // Try by UUID first, then by claim_id string
+    let { data: claim, error } = await supabaseAdmin
       .from('claims')
-      .select('*, profiles(full_name, member_id, plan_name)')
+      .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
       .eq('id', claimId)
       .single()
 
     if (error || !claim) {
+      const res2 = await supabaseAdmin
+        .from('claims')
+        .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
+        .eq('claim_id', claimId)
+        .single()
+      claim = res2.data
+    }
+
+    if (!claim) {
       return NextResponse.json({ error: 'Claim not found' }, { status: 404 })
     }
 
