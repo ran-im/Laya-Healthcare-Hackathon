@@ -370,8 +370,8 @@ export default function AssessorDashboardPage() {
             filtered.map((claim, i) => {
               const rs  = routingStyle(claim.routing)
               const ps  = priorityStyle(claim.priority || 'normal')
-              const fraudScore     = claim.fraud_score     ?? 0
-              const complexScore   = claim.complexity_score ?? 0
+  const fraudScore     = Math.round((claim.fraud_score     ?? 0) * 100)
+  const complexScore   = Math.round((claim.complexity_score ?? 0) * 100)
               const isFraudRisk    = fraudScore >= 60
               const isHighComplex  = complexScore >= 70
 
