@@ -12,11 +12,20 @@ export async function POST(request: Request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { data: claim } = await supabaseAdmin
+    let { data: claim } = await supabaseAdmin
       .from('claims')
-      .select('*, profiles(full_name, member_id, plan_name)')
+      .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
       .eq('id', claimId)
       .single()
+
+    if (!claim) {
+      const res2 = await supabaseAdmin
+        .from('claims')
+        .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
+        .eq('claim_id', claimId)
+        .single()
+      claim = res2.data
+    }
 
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 })
 
