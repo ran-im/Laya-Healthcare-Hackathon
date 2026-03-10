@@ -81,12 +81,13 @@ export default function AIReviewPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [claimRes, docsRes] = await Promise.all([
-        supabase.from('claims').select('*, profiles(full_name,member_id,plan_name,email)')
-          .eq('id', params.id).single(),
-        supabase.from('claim_documents').select('*').eq('claim_id', params.id),
-      ])
+    const [claimRes, docsRes] = await Promise.all([
+      supabase.from('claims').select('*, profiles!claims_member_id_fkey(full_name,member_id,plan_name,email)')
+        .eq('id', params.id).single(),
+      supabase.from('claim_documents').select('*').eq('claim_id', params.id),
+    ])
 
+      console.log('claim fetch result:', claimRes.data, claimRes.error)
       if (claimRes.data) {
         setClaim(claimRes.data)
         setApprovedAmt(claimRes.data.total_amount?.toString() || '')
