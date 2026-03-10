@@ -82,14 +82,19 @@ export default function AIReviewPage() {
       if (!user) { router.push('/login'); return }
 
     const [claimRes, docsRes] = await Promise.all([
-      supabase.from('claims').select('*, profiles!claims_member_id_fkey(full_name,member_id,plan_name,email)')
+      supabase.from('claims').select('*')
         .eq('id', params.id).single(),
       supabase.from('claim_documents').select('*').eq('claim_id', params.id),
     ])
 
-      console.log('claim fetch result:', claimRes.data, claimRes.error)
-      if (claimRes.data) {
-        setClaim(claimRes.data)
+    if (claimRes.data) {
+      // Fetch profile separately
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, member_id, plan_name, email')
+        .eq('id', claimRes.data.member_id)
+        .single()
+      setClaim({ ...claimRes.data, profiles: profileData })
         setApprovedAmt(claimRes.data.total_amount?.toString() || '')
         // If AI summary already exists, add to chat
         if (claimRes.data.ai_summary) {
