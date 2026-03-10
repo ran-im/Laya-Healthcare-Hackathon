@@ -120,7 +120,10 @@ export default function AssessorDashboardPage() {
 
       const { data } = await supabase
         .from('claims')
-        .select('*, profiles(full_name, member_id)')
+        .select(`
+          *,
+          profiles!claims_member_id_fkey(full_name, member_id)
+        `)
         .order('created_at', { ascending: false })
         .limit(100)
 
