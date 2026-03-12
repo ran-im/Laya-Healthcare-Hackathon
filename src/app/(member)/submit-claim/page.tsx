@@ -6,18 +6,17 @@ import { createClient } from '@/lib/supabase/client'
 import { useDropzone } from 'react-dropzone'
 import {
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
-  FileText, X, AlertCircle, Loader2, Shield,
-  Building2, User, Pill, Eye, Zap
+  FileText, X, AlertCircle, Loader2, Shield
 } from 'lucide-react'
 
 // ── Constants ──────────────────────────────────────────
 const CLAIM_TYPES = [
-  { value: 'Outpatient', label: 'Outpatient', icon: <User className="w-5 h-5" />, desc: 'GP visits, consultations' },
-  { value: 'Inpatient', label: 'Inpatient', icon: <Building2 className="w-5 h-5" />, desc: 'Hospital stays' },
-  { value: 'Emergency', label: 'Emergency', icon: <Zap className="w-5 h-5" />, desc: 'A&E, emergency care' },
-  { value: 'Pharmacy', label: 'Pharmacy', icon: <Pill className="w-5 h-5" />, desc: 'Prescriptions, medication' },
-  { value: 'Dental', label: 'Dental', icon: <Shield className="w-5 h-5" />, desc: 'Dental treatments' },
-  { value: 'Optical', label: 'Optical', icon: <Eye className="w-5 h-5" />, desc: 'Glasses, eye tests' },
+  { value: 'Outpatient', label: 'Outpatient', icon: '🏥', description: 'GP visits, consultations' },
+  { value: 'Inpatient', label: 'Inpatient', icon: '🛏️', description: 'Hospital stays' },
+  { value: 'Emergency', label: 'Emergency', icon: '⚡', description: 'A&E, emergency care' },
+  { value: 'Pharmacy', label: 'Pharmacy', icon: '💊', description: 'Prescriptions, medication' },
+  { value: 'Dental', label: 'Dental', icon: '🦷', description: 'Dental treatments' },
+  { value: 'Optical', label: 'Optical', icon: '👓', description: 'Glasses, eye tests' },
 ]
 
 const SERVICE_TYPES = ['GP', 'Specialist', 'Surgery', 'Lab', 'Imaging', 'Other']
@@ -528,27 +527,59 @@ export default function SubmitClaimPage() {
                   <AlertCircle className="w-4 h-4" /> {errors.claimType}
                 </p>
               )}
-              <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'24px'}}>
-                {CLAIM_TYPES.map((ct) => {
-                  const selected = form.claimType === ct.value
-                  return (
-                    <button key={ct.value} type="button"
-                            onClick={() => update('claimType', ct.value)}
-                            style={{
-                              padding:'16px', borderRadius:'12px', textAlign:'left', cursor:'pointer',
-                              border: selected ? '2px solid #00A89D' : '2px solid #F3F4F6',
-                              background: selected ? '#F2FAF9' : 'white',
-                              transition:'all 0.15s', boxShadow: selected ? '0 4px 12px rgba(0,168,157,0.15)' : 'none'
-                            }}>
-                      <div className="mb-2" style={{ color: selected ? '#00A89D' : '#9CA3AF' }}>
-                        {ct.icon}
-                      </div>
-                      <div className="font-semibold text-sm text-gray-900">{ct.label}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{ct.desc}</div>
-                    </button>
-                  )
-                })}
-              </div>
+              <div style={{
+  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: '16px', marginBottom: '32px'
+}}>
+  {CLAIM_TYPES.map(type => {
+    const isSelected = form.claimType === type.value
+    return (
+      <button
+        key={type.value}
+        onClick={() => update('claimType', type.value)}
+        style={{
+          padding: '24px 20px',
+          borderRadius: '16px',
+          border: isSelected ? '2px solid #00A89D' : '2px solid #E5E7EB',
+          background: isSelected ? '#F2FAF9' : 'white',
+          boxShadow: isSelected ? '0 4px 16px rgba(0,168,157,0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
+          cursor: 'pointer',
+          textAlign: 'left',
+          transform: isSelected ? 'translateY(-2px)' : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <div style={{
+          width: '44px', height: '44px', borderRadius: '12px',
+          background: isSelected ? '#00A89D' : '#F3F4F6',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '22px', marginBottom: '12px',
+          transition: 'all 0.15s'
+        }}>
+          {type.icon}
+        </div>
+        <div style={{
+          fontWeight: 700, fontSize: '15px',
+          color: isSelected ? '#003C3A' : '#1F2937',
+          marginBottom: '4px'
+        }}>
+          {type.label}
+        </div>
+        <div style={{ fontSize: '13px', color: '#6B7280' }}>
+          {type.description}
+        </div>
+        {isSelected && (
+          <div style={{
+            marginTop: '10px', display: 'inline-flex', alignItems: 'center',
+            gap: '4px', color: '#00A89D', fontSize: '12px', fontWeight: 600
+          }}>
+            ✓ Selected
+          </div>
+        )}
+      </button>
+    )
+  })}
+</div>
 
               {form.claimType && (
                 <div className="space-y-4 pt-4 border-t border-gray-100">

@@ -128,65 +128,6 @@ export default function ClaimsPage() {
   return (
     <div style={{ minHeight:'100vh', background:'#F8FAFB', fontFamily:'Inter, system-ui, sans-serif' }}>
 
-      {/* ── Navbar ── */}
-      <nav style={{
-        background:'white', borderBottom:'1px solid #F3F4F6',
-        position:'sticky', top:0, zIndex:50,
-        boxShadow:'0 1px 3px rgba(0,0,0,0.06)',
-      }}>
-        <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'0 24px',
-                      display:'flex', alignItems:'center', height:'64px', gap:'24px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-            <div style={{ width:'36px', height:'36px', borderRadius:'10px', display:'flex',
-                          alignItems:'center', justifyContent:'center',
-                          background:'linear-gradient(135deg,#003C3A,#00A89D)' }}>
-              <Shield size={16} color="white" />
-            </div>
-            <div>
-              <div style={{ fontWeight:700, fontSize:'14px', color:'#111827', lineHeight:1 }}>laya</div>
-              <div style={{ color:'#9CA3AF', fontSize:'9px', letterSpacing:'2px', textTransform:'uppercase' }}>healthcare</div>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', gap:'4px', flex:1 }}>
-            {[
-              { label:'Dashboard', href:'/dashboard' },
-              { label:'My Claims', href:'/claims', active:true },
-              { label:'Submit Claim', href:'/submit-claim' },
-              { label:'Benefit Check', href:'/benefit-check' },
-            ].map(item => (
-              <a key={item.label} href={item.href} style={{
-                padding:'6px 14px', borderRadius:'8px', fontSize:'13px', fontWeight:500,
-                textDecoration:'none', transition:'all 0.15s',
-                background: item.active ? '#F2FAF9' : 'transparent',
-                color: item.active ? '#00A89D' : '#6B7280',
-              }}>{item.label}</a>
-            ))}
-          </div>
-
-          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 12px',
-                          background:'#F9FAFB', borderRadius:'10px', border:'1px solid #E5E7EB' }}>
-              <div style={{ width:'28px', height:'28px', borderRadius:'50%', display:'flex',
-                            alignItems:'center', justifyContent:'center', color:'white',
-                            fontSize:'12px', fontWeight:700,
-                            background:'linear-gradient(135deg,#003C3A,#00A89D)' }}>
-                {profile?.full_name?.[0] || 'M'}
-              </div>
-              <span style={{ fontSize:'13px', fontWeight:600, color:'#374151' }}>
-                {profile?.full_name?.split(' ')[0] || 'Member'}
-              </span>
-            </div>
-            <button onClick={handleLogout} style={{
-              padding:'6px', borderRadius:'8px', background:'none', border:'none',
-              cursor:'pointer', color:'#9CA3AF', display:'flex', alignItems:'center',
-            }}>
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </nav>
-
       {/* ── Page Header ── */}
       <div style={{
         background:'linear-gradient(135deg,#003C3A 0%,#005C58 60%,#00A89D 100%)',
