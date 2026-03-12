@@ -183,23 +183,25 @@ export default function AIReviewPage() {
     if (!claim || !decision) return
     setDeciding(true)
     try {
-      const statusMap = { approve: 'Approved', reject: 'Rejected', info: 'Info Required' }
-      const updates: Record<string, unknown> = {
-        status: statusMap[decision],
-        updated_at: new Date().toISOString(),
-        assessor_notes: assessorNotes || null,
-      }
-      if (decision === 'approve') updates.approved_amount = Number(approvedAmt)
-      if (decision === 'reject')  updates.rejection_reason = rejectionReason
-
-      await supabase.from('claims').update(updates).eq('id', claim.id)
+      const res = await fetch('/api/claims/decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          claimId: claim.id, 
+          decision: decision,
+          amount: decision === 'approve' ? approvedAmt : undefined,
+          reason: decision === 'reject' ? rejectionReason : undefined,
+        })
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
 
       // Notification
       await supabase.from('notifications').insert({
         user_id: claim.profiles ? (claim as any).member_id : null,
         claim_id: claim.id,
         type: 'status_update',
-        title: `Claim ${statusMap[decision]}`,
+        title: `Claim ${decision === 'approve' ? 'Approved' : decision === 'reject' ? 'Rejected' : 'Info Required'}`,
         message: decision === 'approve'
           ? `Your claim ${claim.claim_id} has been approved for ${fmt(Number(approvedAmt))}.`
           : decision === 'reject'
