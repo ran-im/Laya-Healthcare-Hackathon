@@ -199,8 +199,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:'20px' }}>
-          <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)', overflow:'hidden' }}>
+        <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)', overflow:'hidden' }}>
             <div style={{ padding:'18px 20px', borderBottom:'1px solid #F9FAFB', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <h2 style={{ fontSize:'15px', fontWeight:600, color:'#111827', margin:0 }}>Recent Claims</h2>
               <a href="/claims" style={{ fontSize:'13px', fontWeight:500, color:'#00A89D', display:'flex', alignItems:'center', gap:'4px' }}>View all <ChevronRight size={14} /></a>
@@ -245,40 +244,6 @@ export default function DashboardPage() {
                 )
               })
             )}
-          </div>
-
-          <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
-            <div style={{ background:'white', borderRadius:'16px', padding:'18px', border:'1px solid #F3F4F6', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 14px 0' }}>Quick Actions</h3>
-              {[
-                { icon:<Plus size={15}/>,     label:'Submit a Claim',   sub:'Upload receipts',        href:'/submit-claim',   color:'#00A89D' },
-                { icon:<Eye size={15}/>,      label:'Check Benefits',   sub:'Is my treatment covered?',href:'/benefit-check',  color:'#2563EB' },
-                { icon:<FileText size={15}/>, label:'View All Claims',  sub:'Full claims history',    href:'/claims',         color:'#7C3AED' },
-                { icon:<User size={15}/>,     label:'My Profile',       sub:'Update bank details',    href:'/profile',        color:'#D97706' },
-              ].map(action => (
-                <a key={action.label} href={action.href} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'10px 8px', borderRadius:'10px', cursor:'pointer', transition:'background 0.15s', textDecoration:'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <div style={{ width:'34px', height:'34px', borderRadius:'10px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background: action.color + '15', color: action.color }}>{action.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:'13px', fontWeight:500, color:'#111827' }}>{action.label}</div>
-                    <div style={{ fontSize:'11px', color:'#9CA3AF' }}>{action.sub}</div>
-                  </div>
-                  <ChevronRight size={14} color="#D1D5DB" />
-                </a>
-              ))}
-            </div>
-
-            <div style={{ borderRadius:'16px', padding:'20px', color:'white', position:'relative', overflow:'hidden', background:'linear-gradient(135deg,#003C3A 0%,#005C58 100%)' }}>
-              <div style={{ position:'absolute', bottom:'-24px', right:'-24px', width:'100px', height:'100px', borderRadius:'50%', background:'rgba(0,212,200,0.12)', pointerEvents:'none' }} />
-              <div style={{ position:'relative' }}>
-                <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'10px', letterSpacing:'2px', textTransform:'uppercase', margin:'0 0 6px 0' }}>Your Plan</p>
-                <h4 style={{ color:'white', fontWeight:700, fontSize:'18px', margin:'0 0 4px 0' }}>{profile?.plan_name || 'Essential Health'}</h4>
-                <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'12px', margin:'0 0 16px 0' }}>Active · Renews annually</p>
-                <a href="/benefit-check" style={{ display:'inline-flex', alignItems:'center', gap:'6px', padding:'7px 14px', background:'rgba(255,255,255,0.14)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'10px', color:'white', fontSize:'12px', fontWeight:600, textDecoration:'none' }}>
-                  <Eye size={13} /> Check coverage
-                </a>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

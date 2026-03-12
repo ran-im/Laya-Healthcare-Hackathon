@@ -1,256 +1,159 @@
 'use client'
-
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Eye, EyeOff, Shield, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
-
-  const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    policyNumber: '',
-    phone: '',
-  })
-  const [showPassword, setShowPassword] = useState(false)
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirm: '' })
+  const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
-  const update = (field: string, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }))
+  const C = { dark: '#003C3A', teal: '#00A89D', warm: '#F2FAF9' }
 
-  const passwordStrength = (pw: string) => {
-    let score = 0
-    if (pw.length >= 8) score++
-    if (/[A-Z]/.test(pw)) score++
-    if (/[0-9]/.test(pw)) score++
-    if (/[^A-Za-z0-9]/.test(pw)) score++
-    return score
-  }
+  const strength = form.password.length === 0 ? 0 : form.password.length < 6 ? 1 : form.password.length < 10 ? 2 : /[A-Z]/.test(form.password) && /[0-9]/.test(form.password) ? 4 : 3
+  const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong']
+  const strengthColor = ['', '#EF4444', '#F59E0B', '#10B981', '#059669']
 
-  const strength = passwordStrength(form.password)
-  const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][strength]
-  const strengthColor = ['', '#E8505B', '#E8A020', '#00A89D', '#003C3A'][strength]
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
-
-    setLoading(true)
+  async function handleSubmit() {
+    if (!agreed) { setError('Please accept the privacy policy'); return }
+    if (form.password !== form.confirm) { setError('Passwords do not match'); return }
+    if (form.password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setLoading(true); setError('')
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: form.email.trim(),
-        password: form.password,
-        options: {
-          data: {
-            full_name: form.fullName,
-            role: 'member',
-          },
-        },
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email, password: form.password,
+        options: { data: { full_name: form.fullName, phone: form.phone } }
       })
-
-      if (signUpError) {
-        setError(signUpError.message)
-        return
+      if (signUpError) throw signUpError
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id, full_name: form.fullName, email: form.email,
+          phone: form.phone, role: 'member', plan_name: 'Premium Health',
+          member_id: 'LH-' + new Date().getFullYear() + '-' + Math.floor(10000 + Math.random() * 90000)
+        })
+        router.push('/dashboard')
       }
-
-      setSuccess(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-8">
-        <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: '#F2FAF9' }}>
-            <CheckCircle2 className="w-8 h-8" style={{ color: '#00A89D' }} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Check your email</h2>
-          <p className="text-gray-500 mb-6">
-            We&apos;ve sent a verification link to <strong className="text-gray-900">{form.email}</strong>.
-            Click the link to activate your account.
-          </p>
-          <a href="/login" className="inline-block w-full py-3 rounded-xl text-white font-semibold text-sm text-center" style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-            Back to Sign In
-          </a>
-        </div>
-      </div>
-    )
+    } catch (e: any) { setError(e.message) }
+    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Panel */}
-      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12" style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="text-white font-bold text-lg leading-none">laya</div>
-            <div className="text-white/60 text-xs tracking-widest uppercase">healthcare</div>
-          </div>
-        </div>
-
+    <div style={{ minHeight: '100vh', display: 'flex' }}>
+      {/* Left brand panel */}
+      <div style={{ width: '420px', background: `linear-gradient(160deg, ${C.dark} 0%, #005C58 50%, ${C.teal} 100%)`, padding: '48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-            Join 700,000+<br />
-            members already<br />
-            <span style={{ color: '#00D4C8' }}>covered.</span>
-          </h1>
-          <p className="text-white/70 text-lg leading-relaxed max-w-sm">
-            Create your account to start submitting claims, checking your benefits, and getting decisions in minutes.
-          </p>
-
-          <div className="mt-10 space-y-4">
-            {['✓ Submit claims from your phone or desktop', '✓ Real-time claim status tracking', '✓ AI-powered instant benefit checks', '✓ Secure, GDPR-compliant platform'].map((item) => (
-              <p key={item} className="text-white/80 text-sm">{item}</p>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '48px' }}>
+            <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: 'white', fontSize: '20px' }}>🛡</span>
+            </div>
+            <div>
+              <div style={{ color: 'white', fontWeight: 800, fontSize: '18px', lineHeight: 1 }}>laya</div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '10px', letterSpacing: '0.15em' }}>HEALTHCARE</div>
+            </div>
           </div>
+          <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px' }}>Join Laya Healthcare</h2>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', lineHeight: 1.6 }}>Create your account to access your health insurance portal, submit claims and check your benefits.</p>
         </div>
-
-        <p className="text-white/40 text-xs">Regulated by the Central Bank of Ireland · Part of AXA Group</p>
+        <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', fontStyle: 'italic', margin: '0 0 8px' }}>"The claims portal has made it so much easier to manage my healthcare. Submitted a claim in under 5 minutes!"</p>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: 0 }}>— Verified Laya Member</p>
+        </div>
       </div>
 
-      {/* Right Panel — Register Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-8 bg-gray-50 overflow-y-auto">
-        <div className="w-full max-w-md py-8">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#003C3A' }}>
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div className="font-bold text-lg text-gray-900">laya healthcare</div>
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Create your account</h2>
-            <p className="text-gray-500 mt-1 text-sm">
-              Already have an account? <a href="/login" className="font-semibold text-teal-600">Sign in</a>
-            </p>
-          </div>
+      {/* Right form panel */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px', background: '#FAFAFA' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.dark, margin: '0 0 6px' }}>Create your account</h1>
+          <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 28px' }}>
+            Already have an account?{' '}
+            <a href="/login" style={{ color: C.teal, textDecoration: 'none', fontWeight: 600 }}>Sign in</a>
+          </p>
 
           {error && (
-            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: '#DC2626', fontSize: '14px' }}>
+              ⚠ {error}
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Full name <span className="text-red-400">*</span></label>
+          {/* Fields */}
+          {[
+            { label: 'Full name *', key: 'fullName', placeholder: 'Jane Smith', type: 'text' },
+            { label: 'Email address *', key: 'email', placeholder: 'you@example.com', type: 'email' },
+            { label: 'Phone number', key: 'phone', placeholder: '+353 87 000 0000', type: 'tel' },
+          ].map(field => (
+            <div key={field.key} style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>{field.label}</label>
               <input
-                type="text"
-                value={form.fullName}
-                onChange={(e) => update('fullName', e.target.value)}
-                placeholder="Jane Smith"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                type={field.type}
+                placeholder={field.placeholder}
+                value={(form as any)[field.key]}
+                onChange={e => setForm(f => ({ ...f, [field.key]: e.target.value }))}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E5E7EB', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: 'white' }}
               />
             </div>
+          ))}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address <span className="text-red-400">*</span></label>
+          {/* Password */}
+          <div style={{ marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Password *</label>
+            <div style={{ position: 'relative' }}>
               <input
-                type="email"
-                value={form.email}
-                onChange={(e) => update('email', e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                type={showPass ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                style={{ width: '100%', padding: '10px 44px 10px 14px', borderRadius: '8px', border: '1.5px solid #E5E7EB', fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: 'white' }}
               />
+              <button onClick={() => setShowPass(s => !s)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '16px' }}>
+                {showPass ? '🙈' : '👁'}
+              </button>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone number</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
-                placeholder="+353 87 000 0000"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
-                  placeholder="Min. 8 characters"
-                  required
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+          {/* Strength bar */}
+          {form.password.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                {[1,2,3,4].map(i => (
+                  <div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', background: i <= strength ? strengthColor[strength] : '#E5E7EB', transition: 'background 0.2s' }} />
+                ))}
               </div>
-              {form.password && (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="flex-1 h-1 rounded-full" style={{ background: i <= strength ? strengthColor : '#E5E7EB' }} />
-                    ))}
-                  </div>
-                  <p className="text-xs" style={{ color: strengthColor }}>{strengthLabel}</p>
-                </div>
-              )}
+              <div style={{ fontSize: '11px', color: strengthColor[strength] }}>{strengthLabel[strength]}</div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password <span className="text-red-400">*</span></label>
-              <input
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => update('confirmPassword', e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              {form.confirmPassword && form.password !== form.confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-              )}
-            </div>
+          {/* Confirm password */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Confirm password *</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={form.confirm}
+              onChange={e => setForm(f => ({ ...f, confirm: e.target.value }))}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: `1.5px solid ${form.confirm && form.confirm !== form.password ? '#EF4444' : '#E5E7EB'}`, fontSize: '14px', outline: 'none', boxSizing: 'border-box', background: 'white' }}
+            />
+          </div>
 
-            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <input type="checkbox" required id="consent" className="mt-0.5 rounded accent-teal-600 cursor-pointer" />
-              <label htmlFor="consent" className="text-xs text-gray-600 cursor-pointer">
-                I confirm the information provided is correct and I consent to Laya Healthcare processing my personal data in accordance with our <a href="/privacy" className="underline text-teal-600">Privacy Policy</a>.
-              </label>
-            </div>
+          {/* Consent */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '24px' }}>
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: '2px', accentColor: C.teal }} />
+            <label style={{ fontSize: '13px', color: '#6B7280', lineHeight: 1.5 }}>
+              I confirm the information provided is correct and I consent to Laya Healthcare processing my personal data in accordance with our{' '}
+              <a href="#" style={{ color: C.teal }}>Privacy Policy</a>.
+            </label>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Creating account...' : 'Create account'}
-            </button>
-          </form>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{ width: '100%', padding: '12px', borderRadius: '10px', background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${C.dark}, ${C.teal})`, color: 'white', border: 'none', fontSize: '15px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}
+          >
+            {loading ? 'Creating account...' : 'Create account →'}
+          </button>
         </div>
       </div>
     </div>
