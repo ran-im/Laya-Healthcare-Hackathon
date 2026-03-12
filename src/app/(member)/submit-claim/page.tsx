@@ -591,46 +591,52 @@ export default function SubmitClaimPage() {
 </div>
 
               {form.claimType && (
-                <div className="space-y-4 pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Pre-authorized claim?</p>
-                      <p className="text-xs text-gray-400">Was this treatment pre-approved by Laya?</p>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6' }}>
+                  <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1.5px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#1F2937', marginBottom: '4px' }}>Pre-authorized claim?</div>
+                        <div style={{ fontSize: '13px', color: '#6B7280' }}>Was this treatment pre-approved by Laya?</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => update('isPreAuthorized', !form.isPreAuthorized)}
+                        style={{
+                          width: '44px', height: '24px', borderRadius: '999px',
+                          background: form.isPreAuthorized ? '#00A89D' : '#D1D5DB',
+                          border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s'
+                        }}>
+                        <span style={{
+                          position: 'absolute', top: '2px', left: form.isPreAuthorized ? '22px' : '2px',
+                          width: '20px', height: '20px', borderRadius: '50%', background: 'white',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'all 0.2s'
+                        }} />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => update('isPreAuthorized', !form.isPreAuthorized)}
-                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                        form.isPreAuthorized ? 'bg-teal-500' : 'bg-gray-300'
-                      }`}>
-                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white
-                                        shadow transition-transform duration-200 ${
-                        form.isPreAuthorized ? 'translate-x-5' : 'translate-x-0'
-                      }`} />
-                    </button>
                   </div>
 
-                  <Field label="Treatment country">
-                    <Select value={form.treatmentCountry}
-                            onChange={e => update('treatmentCountry', e.target.value)}>
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Treatment country</label>
+                    <select
+                      value={form.treatmentCountry}
+                      onChange={e => update('treatmentCountry', e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E5E7EB', fontSize: '14px', background: 'white', color: '#1F2937' }}
+                    >
                       <option>Ireland</option>
                       <option>Abroad</option>
-                    </Select>
-                  </Field>
+                    </select>
+                  </div>
 
-                  <Field label="Brief description (optional)">
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Brief description (optional)</label>
                     <textarea
                       value={form.description}
                       onChange={e => update('description', e.target.value)}
                       placeholder="Brief description of the treatment or reason for claim..."
                       rows={3}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
-                                 text-gray-900 placeholder-gray-400 bg-white focus:outline-none
-                                 resize-none transition-all"
-                      onFocus={e => e.target.style.boxShadow = '0 0 0 2px #00A89D40'}
-                      onBlur={e  => e.target.style.boxShadow = 'none'}
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E5E7EB', fontSize: '14px', background: 'white', color: '#1F2937', minHeight: '80px', resize: 'vertical', boxSizing: 'border-box' }}
                     />
-                  </Field>
+                  </div>
                 </div>
               )}
             </div>
