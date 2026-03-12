@@ -22,13 +22,34 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     async function load() {
-      // Try by UUID first, then by claim_id string
-      let { data } = await supabase.from('claims').select('*').eq('id', params.id).single()
-      if (!data) {
-        const r2 = await supabase.from('claims').select('*').eq('claim_id', params.id).single()
-        data = r2.data
+      setLoading(true)
+      
+      // First try as UUID
+      const { data: byUUID } = await supabase
+        .from('claims')
+        .select('*')
+        .eq('id', params.id)
+        .maybeSingle()
+      
+      if (byUUID) {
+        setClaim(byUUID)
+        setLoading(false)
+        return
       }
-      setClaim(data)
+
+      // Then try as claim_id string  
+      const { data: byClaimId } = await supabase
+        .from('claims')
+        .select('*')
+        .eq('claim_id', params.id)
+        .maybeSingle()
+
+      if (byClaimId) {
+        setClaim(byClaimId)
+        setLoading(false)
+        return
+      }
+
       setLoading(false)
     }
     load()
