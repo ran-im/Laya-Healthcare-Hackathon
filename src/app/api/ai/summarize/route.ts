@@ -1,145 +1,150 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
 
 export async function POST(request: Request) {
   try {
     const { claimId } = await request.json()
-    if (!claimId) return NextResponse.json({ error: 'claimId required' }, { status: 400 })
 
-    console.log('Looking up claim:', claimId)
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
-    // Try by UUID first, then by claim_id string
-    let { data: claim, error } = await supabaseAdmin
+    // Fetch claim — try UUID first, then claim_id string
+    let { data: claim } = await supabaseAdmin
       .from('claims')
       .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
       .eq('id', claimId)
-      .single()
+      .maybeSingle()
 
-    if (error || !claim) {
-      const res2 = await supabaseAdmin
+    if (!claim) {
+      const r2 = await supabaseAdmin
         .from('claims')
         .select('*, profiles!claims_member_id_fkey(full_name, member_id, plan_name)')
         .eq('claim_id', claimId)
-        .single()
-      claim = res2.data
+        .maybeSingle()
+      claim = r2.data
     }
 
-    if (!claim) {
-      return NextResponse.json({ error: 'Claim not found' }, { status: 404 })
-    }
+    if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 })
 
-    const { data: docs } = await supabaseAdmin
-      .from('claim_documents')
-      .select('document_type, file_name')
-      .eq('claim_id', claimId)
+    const prompt = `You are an expert healthcare insurance claims assessor for Laya Healthcare Ireland.
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+Analyze this claim and provide a professional assessment:
 
-    const claimContext = `
-CLAIM DETAILS:
+CLAIM DATA:
 - Claim ID: ${claim.claim_id}
-- Claim Type: ${claim.claim_type} (${claim.service_type})
-- Provider: ${claim.provider_name} (${claim.provider_type})
+- Member: ${claim.profiles?.full_name} (Plan: ${claim.profiles?.plan_name})
+- Type: ${claim.claim_type} / ${claim.service_type}
+- Provider: ${claim.provider_name}
+- Amount: €${claim.total_amount}
 - Service Date: ${claim.service_date}
-- Service Location: ${claim.service_location || 'Not specified'}
-- Diagnosis: ${claim.diagnosis || 'Not specified'}
-- Description: ${claim.description || 'Not specified'}
-- Total Amount Claimed: €${claim.total_amount}
-- Treatment Country: ${claim.treatment_country}
 - Pre-authorized: ${claim.is_pre_authorized ? 'Yes' : 'No'}
-- Admission Date: ${claim.admission_date || 'N/A'}
-- Discharge Date: ${claim.discharge_date || 'N/A'}
+- Treatment Country: ${claim.treatment_country || 'Ireland'}
+- Description: ${claim.description || 'None provided'}
 
-MEMBER DETAILS:
-- Name: ${(claim.profiles as any)?.full_name || 'Unknown'}
-- Member ID: ${(claim.profiles as any)?.member_id || 'Unknown'}
-- Plan: ${(claim.profiles as any)?.plan_name || 'Unknown'}
+SCORING RULES — be accurate and fair:
 
-DOCUMENTS SUBMITTED:
-${docs && docs.length > 0
-  ? docs.map((d: any) => `- ${d.document_type}: ${d.file_name}`).join('\n')
-  : '- No documents submitted'}
-`
+FRAUD SCORE (0.0–1.0):
+- Start at 0.05 (base)
+- +0.30 if amount > €5000 AND not pre-authorized
+- +0.20 if treatment country is NOT Ireland
+- +0.15 if no description provided
+- +0.10 if amount > €2000
+- +0.10 if emergency claim with no pre-auth
+- Keep below 0.40 for routine low-value claims (< €500)
+- Pharmacy/dental/optical under €200 should be 0.05–0.15
+
+COMPLEXITY SCORE (0.0–1.0):
+- Start at 0.10
+- +0.30 if inpatient/surgery
+- +0.20 if amount > €3000
+- +0.15 if has admission + discharge dates
+- +0.10 if emergency
+- Outpatient GP visits: 0.10–0.25
+- Pharmacy under €100: 0.05–0.15
+
+ANOMALY SCORE (0.0–1.0):
+- Start at 0.05
+- +0.20 if amount seems very high for claim type
+- +0.15 if provider name is vague/unusual
+- +0.10 if service type doesn't match claim type
+- Routine claims: keep at 0.05–0.15
+
+RECOMMENDATION LOGIC:
+- "APPROVE" if fraud < 0.25 AND complexity < 0.50 AND amount < €1000
+- "APPROVE" if fraud < 0.15 AND pre-authorized
+- "APPROVE" if pharmacy/dental/optical AND amount < €300 AND fraud < 0.20
+- "REVIEW" if fraud 0.25–0.50 OR complexity > 0.50 OR amount €1000–€5000
+- "REQUEST INFO" if missing description AND amount > €500
+- "REJECT" ONLY if fraud > 0.60 OR (fraud > 0.40 AND anomaly > 0.40)
+- Never recommend REJECT for low-value routine claims
+
+Respond ONLY with this exact JSON format, no other text:
+{
+  "summary": "2-3 sentence professional assessment of this claim",
+  "risk_level": "Low|Medium|High",
+  "amount_reasonable": true or false,
+  "red_flags": ["flag1", "flag2"] or [],
+  "recommendation": "APPROVE|REVIEW|REQUEST INFO|REJECT",
+  "recommendation_reason": "One sentence explaining the recommendation",
+  "fraud_score": 0.00,
+  "complexity_score": 0.00,
+  "anomaly_score": 0.00
+}`
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      system: `You are an expert healthcare insurance claims assessor at Laya Healthcare, Ireland.
-Analyze claims and provide concise, professional assessments.
-
-For each claim:
-1. Summarize in 2-3 sentences
-2. Assess risk level (Low/Medium/High) with brief reasoning  
-3. Check if amount is reasonable for this treatment in Ireland
-4. Flag any missing documents or red flags
-5. Give clear recommendation
-
-Be concise — under 200 words total.
-End with: "RECOMMENDATION: [APPROVE/REJECT/REQUEST INFO] - [one sentence reason]"`,
-      messages: [
-        { role: 'user', content: `Please assess this claim:\n${claimContext}` }
-      ],
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
     })
 
-    const summary = message.content[0].type === 'text' ? message.content[0].text : 'Unable to generate summary.'
+    const responseText = (message.content[0] as any).text
+    const clean = responseText.replace(/```json|```/g, '').trim()
+    const analysis = JSON.parse(clean)
 
-    const recMatch = summary.match(/RECOMMENDATION:\s*(APPROVE|REJECT|REQUEST INFO)/i)
-    const recommendation = recMatch ? recMatch[0] : null
+    // Clamp scores to valid range
+    const fraudScore = Math.min(Math.max(parseFloat(analysis.fraud_score) || 0.05, 0), 1)
+    const complexityScore = Math.min(Math.max(parseFloat(analysis.complexity_score) || 0.10, 0), 1)
+    const anomalyScore = Math.min(Math.max(parseFloat(analysis.anomaly_score) || 0.05, 0), 1)
 
-    // Calculate scores
-    let fraudScore      = 10
-    let complexityScore = 20
-    let anomalyScore    = 5
-
-    if (!claim.is_pre_authorized && claim.total_amount > 2000) fraudScore += 25
-    if (!docs || docs.length === 0)                            fraudScore += 30
-    if (claim.treatment_country !== 'Ireland')                 fraudScore += 20
-    if (claim.total_amount > 5000)                             fraudScore += 15
-    if (claim.claim_type === 'Inpatient')                      complexityScore += 40
-    if (claim.admission_date && claim.discharge_date)          complexityScore += 20
-    if (claim.total_amount > 3000)                             complexityScore += 20
-    if (claim.total_amount > 10000)                            anomalyScore += 50
-    if (claim.total_amount > 5000)                             anomalyScore += 25
-
-    fraudScore      = Math.min(fraudScore, 95)
-    complexityScore = Math.min(complexityScore, 95)
-    anomalyScore    = Math.min(anomalyScore, 95)
-
+    // Routing logic
     let routing = 'assessor'
-    if (fraudScore >= 60)                                      routing = 'fraud'
-    else if (fraudScore < 25 && complexityScore < 30)          routing = 'auto'
+    if (fraudScore >= 0.60) routing = 'fraud'
+    else if (fraudScore < 0.20 && complexityScore < 0.30) routing = 'auto'
 
-    // Store as decimals (0-1) to match DB constraint
+    // Save scores to DB
     await supabaseAdmin
       .from('claims')
       .update({
-        ai_summary: summary,
-        ai_recommendation: recommendation,
-        fraud_score:      fraudScore / 100,
-        complexity_score: complexityScore / 100,
-        anomaly_score:    anomalyScore / 100,
-        routing,
-        status: claim.status === 'Submitted' ? 'In Review' : claim.status,
-        updated_at: new Date().toISOString(),
+        fraud_score: fraudScore,
+        complexity_score: complexityScore,
+        anomaly_score: anomalyScore,
+        ai_summary: analysis.summary,
+        routing: routing,
+        updated_at: new Date().toISOString()
       })
-      .eq('id', claimId)
+      .eq('id', claim.id)
 
     return NextResponse.json({
-      summary,
-      recommendation,
-      scores: { fraud: fraudScore, complexity: complexityScore, anomaly: anomalyScore },
-      routing,
+      summary: analysis.summary,
+      risk_level: analysis.risk_level,
+      amount_reasonable: analysis.amount_reasonable,
+      red_flags: analysis.red_flags || [],
+      recommendation: analysis.recommendation,
+      recommendation_reason: analysis.recommendation_reason,
+      fraud_score: fraudScore,
+      complexity_score: complexityScore,
+      anomaly_score: anomalyScore,
+      routing
     })
 
-  } catch (err) {
-    console.error('AI summarize error:', err)
-    return NextResponse.json({ error: 'AI service error', details: String(err) }, { status: 500 })
+  } catch (error: any) {
+    console.error('AI summarize error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
