@@ -497,12 +497,6 @@ export default function SubmitClaimPage() {
       <div className="text-white py-8 px-4"
            style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <button onClick={() => router.push('/dashboard')}
-                    className="text-white/70 hover:text-white transition-colors text-sm flex items-center gap-1">
-              <ChevronLeft className="w-4 h-4" /> Dashboard
-            </button>
-          </div>
           <h1 className="text-2xl font-bold">Submit a Claim</h1>
           <p className="text-white/70 text-sm mt-1">
             Complete all steps to submit your healthcare claim
