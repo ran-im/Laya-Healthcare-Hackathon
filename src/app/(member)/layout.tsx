@@ -8,6 +8,7 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
   const supabase = createClient()
   const [profile, setProfile] = useState<any>(null)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -95,12 +96,73 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
           )}
 
           {/* Logout */}
-          <button onClick={logout} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9CA3AF', padding: '4px' }} title="Sign out">⎋</button>
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            style={{
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              padding: '8px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: '#DC2626',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            <span>→|</span>
+            <span>Sign out</span>
+          </button>
         </div>
       </nav>
 
       {/* PAGE CONTENT */}
       {children}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '12px', padding: '24px',
+            maxWidth: '400px', width: '90%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+              Sign out?
+            </h2>
+            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>
+              Are you sure you want to sign out of your account?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: '1px solid #E5E7EB',
+                  background: 'white', color: '#374151', fontSize: '14px', fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={logout}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none',
+                  background: '#DC2626', color: 'white', fontSize: '14px', fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
