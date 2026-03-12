@@ -16,33 +16,50 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; icon: string }> 
 
 export default function ClaimDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const supabase = createClient()
   const [claim, setClaim] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       
-      // First try as UUID
-      const { data: byUUID } = await supabase
+      // Create client inside effect to ensure fresh session
+      const supabase = createClient()
+      
+      // Verify user is logged in
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      console.log('Looking up claim ID:', params.id)
+      console.log('Current user ID:', user.id)
+
+      // Try by UUID
+      const { data: byUUID, error: e1 } = await supabase
         .from('claims')
         .select('*')
         .eq('id', params.id)
         .maybeSingle()
-      
+
+      console.log('UUID lookup result:', byUUID, 'error:', e1)
+
       if (byUUID) {
         setClaim(byUUID)
         setLoading(false)
         return
       }
 
-      // Then try as claim_id string  
-      const { data: byClaimId } = await supabase
+      // Try by claim_id string
+      const { data: byClaimId, error: e2 } = await supabase
         .from('claims')
         .select('*')
         .eq('claim_id', params.id)
         .maybeSingle()
+
+      console.log('claim_id lookup result:', byClaimId, 'error:', e2)
 
       if (byClaimId) {
         setClaim(byClaimId)
@@ -50,6 +67,7 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
         return
       }
 
+      setError(`No claim found for ID: ${params.id}`)
       setLoading(false)
     }
     load()
@@ -64,7 +82,8 @@ export default function ClaimDetailPage({ params }: { params: { id: string } }) 
   if (!claim) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '16px' }}>
       <div style={{ fontSize: '48px' }}>🔍</div>
-      <div style={{ color: '#6B7280', fontSize: '16px' }}>Claim not found</div>
+      <div style={{ color: '#6B7280', fontSize: '16px' }}>{error || 'Claim not found'}</div>
+      <div style={{ color: '#9CA3AF', fontSize: '12px', fontFamily: 'monospace' }}>ID: {params.id}</div>
       <button onClick={() => router.push('/claims')} style={{ background: C.teal, color: 'white', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Back to Claims</button>
     </div>
   )
