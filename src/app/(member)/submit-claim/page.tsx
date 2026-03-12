@@ -80,14 +80,14 @@ function Field({
   label: string; required?: boolean; error?: string; children: React.ReactNode
 }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
+    <div style={{ marginBottom: '20px' }}>
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+        {label} {required && <span style={{ color: '#EF4444' }}>*</span>}
       </label>
       {children}
       {error && (
-        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" /> {error}
+        <p style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <AlertCircle size={12} /> {error}
         </p>
       )}
     </div>
@@ -99,12 +99,19 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement> & { error?: st
   return (
     <input
       {...rest}
-      className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-900
-                  placeholder-gray-400 bg-white focus:outline-none transition-all
-                  ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'}
-                  ${rest.className || ''}`}
-      onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px #00A89D40'; rest.onFocus?.(e) }}
-      onBlur={(e)  => { e.target.style.boxShadow = 'none'; rest.onBlur?.(e) }}
+      style={{
+        width: '100%',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        border: error ? '1.5px solid #EF4444' : '1.5px solid #E5E7EB',
+        fontSize: '14px',
+        outline: 'none',
+        boxSizing: 'border-box' as const,
+        background: error ? '#FEF2F2' : 'white',
+        color: '#1F2937',
+      }}
+      onFocus={(e) => { e.target.style.borderColor = '#00A89D'; e.target.style.boxShadow = '0 0 0 2px #00A89D40' }}
+      onBlur={(e)  => { e.target.style.borderColor = error ? '#EF4444' : '#E5E7EB'; e.target.style.boxShadow = 'none' }}
     />
   )
 }
@@ -113,11 +120,19 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
-                  text-gray-900 bg-white focus:outline-none transition-all
-                  ${props.className || ''}`}
-      onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #00A89D40'}
-      onBlur={(e)  => e.target.style.boxShadow = 'none'}
+      style={{
+        width: '100%',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        border: '1.5px solid #E5E7EB',
+        fontSize: '14px',
+        outline: 'none',
+        boxSizing: 'border-box' as const,
+        background: 'white',
+        color: '#1F2937',
+      }}
+      onFocus={(e) => { e.target.style.borderColor = '#00A89D'; e.target.style.boxShadow = '0 0 0 2px #00A89D40' }}
+      onBlur={(e)  => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
     />
   )
 }
