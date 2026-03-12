@@ -26,7 +26,7 @@ interface Claim {
 }
 
 interface Document {
-  id: string; document_type: string; file_name: string; file_url: string | null; file_size: number
+  id: string; document_type: string; file_name: string; file_url: string | null; file_size: number; file_path: string | null
 }
 
 interface ChatMessage {
@@ -107,6 +107,28 @@ export default function AIReviewPage() {
       }
       if (docsRes.data) setDocs(docsRes.data)
     } finally { setLoading(false) }
+  }
+
+  // ── View Document ──
+  async function viewDocument(filePath: string) {
+    const { data } = supabase.storage
+      .from('claim-documents')
+      .getPublicUrl(filePath)
+    
+    if (data?.publicUrl) {
+      window.open(data.publicUrl, '_blank')
+      return
+    }
+
+    const { data: signed, error } = await supabase.storage
+      .from('claim-documents')
+      .createSignedUrl(filePath, 3600)
+    
+    if (signed?.signedUrl) {
+      window.open(signed.signedUrl, '_blank')
+    } else {
+      alert('Could not open document: ' + error?.message)
+    }
   }
 
   // ── Generate AI Summary ──
@@ -457,13 +479,13 @@ export default function AIReviewPage() {
                         {doc.document_type} · {(doc.file_size / 1024).toFixed(0)} KB
                       </p>
                     </div>
-                    {doc.file_url && (
-                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+                    {doc.file_path && (
+                      <button onClick={() => viewDocument(doc.file_path!)}
                         style={{ padding:'6px 10px', borderRadius:'8px', background:'#003C3A',
                                  color:'white', fontSize:'11px', fontWeight:600, display:'flex',
-                                 alignItems:'center', gap:'4px', textDecoration:'none' }}>
+                                 alignItems:'center', gap:'4px', border:'none', cursor:'pointer' }}>
                         <Download size={12} /> View
-                      </a>
+                      </button>
                     )}
                   </div>
                 ))}
