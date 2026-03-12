@@ -334,13 +334,13 @@ export default function SubmitClaimPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [step, setStep]   = useState(0)
-  const [form, setForm]   = useState<FormData>(initialForm)
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState<FormData>(initialForm)
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted]   = useState(false)
-  const [claimId, setClaimId]       = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [claimId, setClaimId] = useState('')
 
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -348,10 +348,10 @@ export default function SubmitClaimPage() {
   // ── Validation per step ──
   function validateStep(s: number): boolean {
     const e: Partial<Record<keyof FormData, string>> = {}
-    if (s === 0) {
+    if (s === 1) {
       if (!form.claimType) e.claimType = 'Please select a claim type'
     }
-    if (s === 1) {
+    if (s === 2) {
       if (!form.serviceDate)   e.serviceDate   = 'Service date is required'
       if (!form.providerName)  e.providerName  = 'Provider name is required'
       if (!form.providerType)  e.providerType  = 'Provider type is required'
@@ -365,7 +365,7 @@ export default function SubmitClaimPage() {
       if (form.serviceDate && new Date(form.serviceDate) > new Date())
         e.serviceDate = 'Service date cannot be in the future'
     }
-    if (s === 2) {
+    if (s === 3) {
       if (files.length === 0) {
         // soft warning — we allow submission but will show warning
       }
@@ -495,7 +495,7 @@ export default function SubmitClaimPage() {
               View My Claims
             </button>
             <button
-              onClick={() => { setSubmitted(false); setStep(0); setForm(initialForm); setFiles([]) }}
+              onClick={() => { setSubmitted(false); setStep(1); setForm(initialForm); setFiles([]) }}
               className="w-full py-3 rounded-xl text-gray-600 font-semibold text-sm
                          bg-gray-100 hover:bg-gray-200 transition-colors">
               Submit Another Claim
@@ -507,25 +507,22 @@ export default function SubmitClaimPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="text-white py-8 px-4"
-           style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 60%, #00A89D 100%)' }}>
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold">Submit a Claim</h1>
-          <p className="text-white/70 text-sm mt-1">
-            Complete all steps to submit your healthcare claim
-          </p>
-        </div>
+    <div style={{ background: '#F8FAFA', minHeight: '100vh' }}>
+      {/* Teal header */}
+      <div style={{ background: 'linear-gradient(135deg, #003C3A 0%, #005C58 50%, #00A89D 100%)', padding: '32px', marginBottom: '0' }}>
+        <h1 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 4px' }}>Submit a Claim</h1>
+        <p style={{ color: 'rgba(255,255,255,0.75)', margin: 0, fontSize: '15px' }}>Complete all steps to submit your healthcare claim</p>
       </div>
 
-      {/* Form Card */}
-      <div className="max-w-2xl mx-auto px-4 -mt-4 pb-12">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+      {/* Step content card */}
+      <div style={{ maxWidth: '900px', margin: '32px auto', padding: '0 24px' }}>
+        <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          
+          {/* Step indicator */}
           <StepIndicator current={step} steps={STEPS} />
 
-          {/* ── STEP 0: Claim Type ── */}
-          {step === 0 && (
+          {/* Step content */}
+          {step === 1 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Select Claim Type</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -643,7 +640,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 1: Service + Provider + Cost ── */}
-          {step === 1 && (
+          {step === 4 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Treatment & Provider Details</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -774,7 +771,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 2: Documents ── */}
-          {step === 2 && (
+          {step === 4 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Upload Documents</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -790,7 +787,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 3: Review ── */}
-          {step === 3 && (
+          {step === 4 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Review & Submit</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -909,7 +906,7 @@ export default function SubmitClaimPage() {
 
           {/* ── Navigation Buttons ── */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-            {step > 0 ? (
+            {step > 1 ? (
               <button type="button" onClick={back}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
                                  font-medium text-gray-600 bg-gray-100 hover:bg-gray-200
@@ -924,9 +921,9 @@ export default function SubmitClaimPage() {
               </button>
             )}
 
-            {step < STEPS.length - 1 ? (
+            {step < STEPS.length ? (
               <button type="button" onClick={next}
-                      disabled={step === 0 && !form.claimType}
+                      disabled={step === 4 && !form.claimType}
                       className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm
                                  font-semibold text-white transition-all hover:-translate-y-0.5
                                  disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
