@@ -98,7 +98,7 @@ export default function LoginPage() {
             — decisions in seconds, not days.
           </p>
 
-          {/* Stats */}
+          {/* Stats */} 
           <div style={{ display: 'flex', gap: '40px' }}>
             {[
               { value: '94%',   label: 'Auto-approved' },
