@@ -133,7 +133,9 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
       }}
       onFocus={(e) => { e.target.style.borderColor = '#00A89D'; e.target.style.boxShadow = '0 0 0 2px #00A89D40' }}
       onBlur={(e)  => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
-    />
+    >
+      {props.children}
+    </select>
   )
 }
 
@@ -640,7 +642,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 1: Service + Provider + Cost ── */}
-          {step === 4 && (
+          {step === 1 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Treatment & Provider Details</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -771,7 +773,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 2: Documents ── */}
-          {step === 4 && (
+          {step === 2 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Upload Documents</h2>
               <p className="text-gray-500 text-sm mb-6">
@@ -787,7 +789,7 @@ export default function SubmitClaimPage() {
           )}
 
           {/* ── STEP 3: Review ── */}
-          {step === 4 && (
+          {step === 3 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Review & Submit</h2>
               <p className="text-gray-500 text-sm mb-6">
