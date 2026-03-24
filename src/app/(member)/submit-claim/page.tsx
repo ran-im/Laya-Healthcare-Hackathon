@@ -409,8 +409,9 @@ export default function SubmitClaimPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [claimId, setClaimId] = useState('')
   const [consent, setConsent] = useState(false)
-
+  
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
 
@@ -508,6 +509,54 @@ export default function SubmitClaimPage() {
       if (claimErr) throw claimErr
       if (!claim) throw new Error('No claim returned')
 
+        // ── Send to decision engine ──
+const aiResponse = await fetch('/api/ai/assess-claim', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    claimData: {
+      claim_id:              newClaimId,
+      member_id:             user.id,
+      policy_id:             null,
+      claim_type:            form.claimType,
+      service_type:          form.serviceType,
+      provider_name:         form.providerName,
+      treatment_country:     form.treatmentCountry,
+      service_date:          form.serviceDate,
+      admission_date:        form.admissionDate || null,
+      discharge_date:        form.dischargeDate || null,
+      amount_claimed_eur:    Number(form.totalAmount),
+      member_already_paid:   form.memberAlreadyPaid,
+      reimbursement_type:    form.reimbursementType,
+      document_types:        files.map(f => f.docType.toLowerCase()),
+      declaration_confirmed: consent,
+      consent_medical_data:  consent,
+      terms_accepted:        consent,
+      is_accident_or_injury: form.isAccidentOrInjury,
+      is_pre_existing:       form.isPreExisting,
+      overseas_preapproved:  form.treatmentCountry === 'Abroad' && form.isPreAuthorized,
+    }
+  }),
+})
+
+const aiResult = await aiResponse.json()
+console.log('AI Decision:', aiResult.decision, '|', aiResult.decision_reason)
+
+// ── Save AI result to Supabase ──
+await supabase.from('claims')
+  .update({
+    ai_decision:        aiResult.decision,
+    ai_decision_reason: aiResult.decision_reason,
+    ai_payable_amount:  aiResult.provisional_payable_eur,
+    ai_approved_amount: aiResult.approved_amount_eur,
+    routing: aiResult.decision === 'APPROVE'    ? 'auto_approved'
+           : aiResult.decision === 'REJECT'     ? 'auto_rejected'
+           : aiResult.decision === 'NEEDS_INFO' ? 'needs_info'
+           : 'manual_review',
+  })
+  .eq('id', claim.id)
+
+
       // 2. Upload documents to Supabase Storage
       for (const uf of files) {
         const ext      = uf.file.name.split('.').pop()
@@ -544,11 +593,13 @@ export default function SubmitClaimPage() {
         action_url: `/claims/${claim.id}`,
       })
 
-      
+      setClaimId(newClaimId)
       setSubmitted(true)
     } catch (err) {
-      console.error(err)
-      alert('Something went wrong. Please try again.')
+  console.error('Full error:', JSON.stringify(err, null, 2))
+  console.error('Error object:', err)
+  alert(`Error: ${JSON.stringify(err)}`)
+
     } finally {
       setSubmitting(false)
     }
@@ -567,7 +618,7 @@ export default function SubmitClaimPage() {
           <p className="text-gray-500 mb-2">Your claim reference number is:</p>
           <div className="inline-block px-4 py-2 rounded-xl font-mono font-bold text-lg mb-6"
                style={{ background: '#F2FAF9', color: '#003C3A' }}>
-            
+            {claimId}
           </div>
           <p className="text-gray-500 text-sm mb-8">
             We have received your claim and it is now being processed. You will receive
@@ -721,7 +772,7 @@ export default function SubmitClaimPage() {
                       </button>
                     </div>
                   </div>
-                  
+
                   <div style={{ marginTop: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Treatment country</label>
                     <select
