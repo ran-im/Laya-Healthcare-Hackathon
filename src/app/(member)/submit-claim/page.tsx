@@ -158,12 +158,10 @@ function DocumentUpload({
   const required = REQUIRED_DOCS[claimType] || []
 
   const onDrop = useCallback((accepted: File[]) => {
-    const newFiles = accepted.map(file => ({
-      file,
-      docType,
+    onAdd(accepted.map(file => ({
+      file, docType,
       preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-    }))
-    onAdd(newFiles)
+    })))
   }, [docType, onAdd])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -174,28 +172,46 @@ function DocumentUpload({
 
   const uploadedTypes = files.map(f => f.docType)
   const missingDocs   = required.filter(r => !uploadedTypes.includes(r))
+  const allUploaded   = required.length > 0 && missingDocs.length === 0
 
   return (
-    <div className="space-y-4">
-      {/* Required docs notice */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* Required docs tracker */}
       {required.length > 0 && (
-        <div className="p-4 rounded-xl border text-sm"
-             style={{ background: '#F2FAF9', borderColor: '#00A89D30' }}>
-          <p className="font-medium mb-2" style={{ color: '#003C3A' }}>
-            Required for {claimType} claims:
-          </p>
-          <div className="flex flex-wrap gap-2">
+        <div style={{
+          padding: '16px 20px', borderRadius: '14px',
+          background: allUploaded ? '#F0FDF4' : '#FFFBEB',
+          border: `1.5px solid ${allUploaded ? '#86EFAC' : '#FDE68A'}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: allUploaded ? '#15803D' : '#92400E', margin: 0 }}>
+              {allUploaded ? '✓ All required documents uploaded' : `Required for ${claimType} claims`}
+            </p>
+            <span style={{
+              fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
+              background: allUploaded ? '#DCFCE7' : '#FEF3C7',
+              color: allUploaded ? '#16A34A' : '#D97706',
+            }}>
+              {required.length - missingDocs.length}/{required.length} uploaded
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {required.map(doc => {
               const uploaded = uploadedTypes.includes(doc)
               return (
-                <span key={doc}
-                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1
-                                 rounded-full font-medium"
-                      style={{
-                        background: uploaded ? '#ECFDF5' : '#FEF3C7',
-                        color: uploaded ? '#059669' : '#D97706',
-                      }}>
-                  {uploaded ? '✓' : '!'} {doc}
+                <span key={doc} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '5px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
+                  background: uploaded ? '#DCFCE7' : 'white',
+                  color: uploaded ? '#15803D' : '#B45309',
+                  border: `1.5px solid ${uploaded ? '#86EFAC' : '#FDE68A'}`,
+                }}>
+                  {uploaded
+                    ? <CheckCircle2 size={12} />
+                    : <span style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1.5px solid #D97706', display: 'inline-block' }} />
+                  }
+                  {doc}
                 </span>
               )
             })}
@@ -203,60 +219,107 @@ function DocumentUpload({
         </div>
       )}
 
-      {/* Doc type selector + drop zone */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Document type
-        </label>
-        <Select value={docType} onChange={(e) => setDocType(e.target.value)}>
-          {['Invoice','Receipt','Discharge Summary','Prescription',
-            'Referral Letter','Lab Report','Pre-authorization','Other'].map(t => (
-            <option key={t}>{t}</option>
-          ))}
-        </Select>
+      {/* Doc type selector */}
+      <div style={{
+        display: 'flex', gap: '12px', alignItems: 'flex-end',
+        padding: '16px 20px', background: '#F8FAFC',
+        borderRadius: '14px', border: '1px solid #E5E7EB',
+      }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#6B7280', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Document type to upload
+          </label>
+          <Select value={docType} onChange={(e) => setDocType(e.target.value)}>
+            {['Invoice','Receipt','Discharge Summary','Prescription',
+              'Referral Letter','Lab Report','Pre-authorization','Other'].map(t => (
+              <option key={t}>{t}</option>
+            ))}
+          </Select>
+        </div>
+        <div style={{
+          padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+          background: required.includes(docType) && !uploadedTypes.includes(docType) ? '#FEF3C7' : '#F0FDF4',
+          color: required.includes(docType) && !uploadedTypes.includes(docType) ? '#D97706' : '#16A34A',
+          whiteSpace: 'nowrap', border: '1px solid',
+          borderColor: required.includes(docType) && !uploadedTypes.includes(docType) ? '#FDE68A' : '#86EFAC',
+        }}>
+          {required.includes(docType)
+            ? uploadedTypes.includes(docType) ? '✓ Uploaded' : '! Required'
+            : 'Optional'}
+        </div>
       </div>
 
-      <div {...getRootProps()}
-           className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer
-                       transition-all duration-200 ${
-             isDragActive
-               ? 'border-teal-400 bg-teal-50'
-               : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-           }`}>
+      {/* Drop zone */}
+      <div {...getRootProps()} style={{
+        border: `2px dashed ${isDragActive ? '#00A89D' : '#D1D5DB'}`,
+        borderRadius: '18px', padding: '48px 24px', textAlign: 'center',
+        cursor: 'pointer', transition: 'all 0.2s',
+        background: isDragActive ? 'rgba(0,168,157,0.04)' : 'linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%)',
+      }}>
         <input {...getInputProps()} />
-        <Upload className={`w-8 h-8 mx-auto mb-3 ${isDragActive ? 'text-teal-500' : 'text-gray-400'}`} />
-        <p className="text-sm font-medium text-gray-700 mb-1">
-          {isDragActive ? 'Drop files here' : 'Drag & drop files here'}
+        <div style={{
+          width: '64px', height: '64px', borderRadius: '20px',
+          background: isDragActive ? '#00A89D' : 'white',
+          boxShadow: isDragActive ? 'none' : '0 2px 12px rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px', transition: 'all 0.2s',
+        }}>
+          <Upload size={28} color={isDragActive ? 'white' : '#9CA3AF'} />
+        </div>
+        <p style={{ fontSize: '16px', fontWeight: 700, color: '#1F2937', margin: '0 0 6px' }}>
+          {isDragActive ? 'Drop your file here' : 'Drag & drop your file'}
         </p>
-        <p className="text-xs text-gray-400">PDF, JPG, PNG · Max 10MB per file</p>
-        <button type="button"
-                className="mt-4 px-4 py-2 rounded-xl text-sm font-medium text-white"
-                style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
+        <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 20px' }}>
+          PDF, JPG or PNG · Max 10MB per file
+        </p>
+        <span style={{
+          display: 'inline-block', padding: '10px 24px', borderRadius: '10px',
+          background: 'linear-gradient(135deg, #003C3A, #00A89D)',
+          color: 'white', fontSize: '13px', fontWeight: 600,
+          boxShadow: '0 4px 12px rgba(0,168,157,0.25)',
+        }}>
           Browse files
-        </button>
+        </span>
+        <p style={{ fontSize: '12px', color: '#D1D5DB', margin: '14px 0 0' }}>
+          Will be uploaded as: <strong style={{ color: '#6B7280' }}>{docType}</strong>
+        </p>
       </div>
 
       {/* File list */}
       {files.length > 0 && (
-        <div className="space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <p style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+            Uploaded files ({files.length})
+          </p>
           {files.map((f, i) => (
-            <div key={i}
-                 className="flex items-center gap-3 p-3 bg-white border border-gray-100
-                            rounded-xl shadow-sm">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                   style={{ background: '#F2FAF9' }}>
-                <FileText className="w-4 h-4" style={{ color: '#00A89D' }} />
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '12px 16px', borderRadius: '12px',
+              background: 'white', border: '1px solid #E5E7EB',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            }}>
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '10px',
+                background: 'rgba(0,168,157,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <FileText size={18} color='#00A89D' />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{f.file.name}</p>
-                <p className="text-xs text-gray-400">
-                  {f.docType} · {(f.file.size / 1024).toFixed(0)} KB
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.file.name}
                 </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px', background: 'rgba(0,168,157,0.1)', color: '#00A89D' }}>{f.docType}</span>
+                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{(f.file.size / 1024).toFixed(0)} KB</span>
+                </div>
               </div>
-              <button type="button" onClick={() => onRemove(i)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400
-                                 hover:text-red-500 transition-colors flex-shrink-0">
-                <X className="w-4 h-4" />
+              <button type="button" onClick={() => onRemove(i)} style={{
+                padding: '7px', borderRadius: '8px', border: 'none',
+                background: '#FEF2F2', cursor: 'pointer', color: '#EF4444',
+                display: 'flex', alignItems: 'center', flexShrink: 0,
+              }}>
+                <X size={15} />
               </button>
             </div>
           ))}
@@ -265,14 +328,14 @@ function DocumentUpload({
 
       {/* Missing warning */}
       {missingDocs.length > 0 && files.length > 0 && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200
-                        rounded-xl text-sm text-amber-700">
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <div style={{
+          display: 'flex', gap: '12px', padding: '14px 16px',
+          borderRadius: '12px', background: '#FFFBEB', border: '1px solid #FDE68A',
+        }}>
+          <AlertCircle size={17} color='#D97706' style={{ flexShrink: 0, marginTop: '1px' }} />
           <div>
-            <p className="font-medium">Missing documents</p>
-            <p className="text-xs mt-0.5">
-              Please upload: {missingDocs.join(', ')}
-            </p>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: '#92400E', margin: '0 0 2px' }}>Still missing</p>
+            <p style={{ fontSize: '12px', color: '#B45309', margin: 0 }}>Please also upload: {missingDocs.join(', ')}</p>
           </div>
         </div>
       )}
@@ -307,6 +370,8 @@ interface FormData {
   accountHolderName: string
   iban: string
   bic: string
+  isAccidentOrInjury: boolean
+  isPreExisting: boolean
 }
 
 const initialForm: FormData = {
@@ -330,6 +395,8 @@ const initialForm: FormData = {
   accountHolderName: '',
   iban: '',
   bic: '',
+  isAccidentOrInjury: false,
+  isPreExisting: false,
 }
 
 export default function SubmitClaimPage() {
@@ -342,7 +409,7 @@ export default function SubmitClaimPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [claimId, setClaimId] = useState('')
+  const [consent, setConsent] = useState(false)
 
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -376,16 +443,12 @@ export default function SubmitClaimPage() {
     return Object.keys(e).length === 0
   }
 
-  function next() {
-    if (validateStep(step)) setStep(s => s + 1)
-  }
-  function back() {
-    setErrors({})
-    setStep(s => s - 1)
-  }
+  function next() { if (validateStep(step)) setStep(s => Math.min(s + 1, 4)) }
+  function back() { setErrors({}); setStep(s => Math.max(s - 1, 1)) }
 
   // ── Submit ──
   async function handleSubmit() {
+    if (!consent) return
     setSubmitting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -399,6 +462,8 @@ export default function SubmitClaimPage() {
         .insert({
           claim_id: newClaimId,
           member_id: user.id,
+          contact_email: user.email,
+          submission_date: new Date().toISOString(),
           claim_type: form.claimType,
           service_type: form.serviceType,
           is_pre_authorized: form.isPreAuthorized,
@@ -416,6 +481,24 @@ export default function SubmitClaimPage() {
           currency: form.currency,
           member_already_paid: form.memberAlreadyPaid,
           reimbursement_type: form.reimbursementType,
+          // user answers
+          is_accident_or_injury: form.isAccidentOrInjury,
+          is_pre_existing: form.isPreExisting,
+          emergency_overseas: form.claimType === 'Emergency' && form.treatmentCountry === 'Abroad',
+          overseas_preapproved: form.treatmentCountry === 'Abroad' && form.isPreAuthorized,
+          // consent — all map to the same checkbox
+          declaration_confirmed: consent,
+          consent_medical_data: consent,
+          terms_accepted: consent,
+          // server-side defaults (AI/assessor sets these later)
+          duplicate_claim: false,
+          is_experimental: false,
+          is_cosmetic: false,
+          infertility_related: false,
+          first_steps_fertility_benefit: false,
+          low_confidence_ocr: false,
+          manual_fraud_flag: false,
+          fraud_confirmed: false,
           status: 'Submitted',
           routing: 'pending',
         })
@@ -423,6 +506,7 @@ export default function SubmitClaimPage() {
         .single()
 
       if (claimErr) throw claimErr
+      if (!claim) throw new Error('No claim returned')
 
       // 2. Upload documents to Supabase Storage
       for (const uf of files) {
@@ -460,7 +544,7 @@ export default function SubmitClaimPage() {
         action_url: `/claims/${claim.id}`,
       })
 
-      setClaimId(newClaimId)
+      
       setSubmitted(true)
     } catch (err) {
       console.error(err)
@@ -483,7 +567,7 @@ export default function SubmitClaimPage() {
           <p className="text-gray-500 mb-2">Your claim reference number is:</p>
           <div className="inline-block px-4 py-2 rounded-xl font-mono font-bold text-lg mb-6"
                style={{ background: '#F2FAF9', color: '#003C3A' }}>
-            {claimId}
+            
           </div>
           <p className="text-gray-500 text-sm mb-8">
             We have received your claim and it is now being processed. You will receive
@@ -497,7 +581,7 @@ export default function SubmitClaimPage() {
               View My Claims
             </button>
             <button
-              onClick={() => { setSubmitted(false); setStep(1); setForm(initialForm); setFiles([]) }}
+              onClick={() => { setSubmitted(false); setStep(1); setForm(initialForm); setFiles([]); setConsent(false) }}
               className="w-full py-3 rounded-xl text-gray-600 font-semibold text-sm
                          bg-gray-100 hover:bg-gray-200 transition-colors">
               Submit Another Claim
@@ -614,6 +698,30 @@ export default function SubmitClaimPage() {
                     </div>
                   </div>
 
+                  <div style={{ marginTop: '12px', background: 'white', borderRadius: '12px', padding: '20px', border: '1.5px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#1F2937', marginBottom: '4px' }}>Related to accident or injury?</div>
+                        <div style={{ fontSize: '13px', color: '#6B7280' }}>Was this claim due to an accident or injury?</div>
+                      </div>
+                      <button type="button" onClick={() => update('isAccidentOrInjury', !form.isAccidentOrInjury)} style={{ width: '44px', height: '24px', borderRadius: '999px', background: form.isAccidentOrInjury ? '#00A89D' : '#D1D5DB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', flexShrink: 0 }}>
+                        <span style={{ position: 'absolute', top: '2px', left: form.isAccidentOrInjury ? '22px' : '2px', width: '20px', height: '20px', borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'all 0.2s' }} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '12px', background: 'white', borderRadius: '12px', padding: '20px', border: '1.5px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#1F2937', marginBottom: '4px' }}>Pre-existing condition?</div>
+                        <div style={{ fontSize: '13px', color: '#6B7280' }}>Is this related to a pre-existing condition?</div>
+                      </div>
+                      <button type="button" onClick={() => update('isPreExisting', !form.isPreExisting)} style={{ width: '44px', height: '24px', borderRadius: '999px', background: form.isPreExisting ? '#00A89D' : '#D1D5DB', border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', flexShrink: 0 }}>
+                        <span style={{ position: 'absolute', top: '2px', left: form.isPreExisting ? '22px' : '2px', width: '20px', height: '20px', borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'all 0.2s' }} />
+                      </button>
+                    </div>
+                  </div>
+                  
                   <div style={{ marginTop: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Treatment country</label>
                     <select
@@ -625,7 +733,7 @@ export default function SubmitClaimPage() {
                       <option>Abroad</option>
                     </select>
                   </div>
-
+                  
                   <div style={{ marginTop: '16px' }}>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Brief description (optional)</label>
                     <textarea
@@ -774,176 +882,196 @@ export default function SubmitClaimPage() {
 
           {/* ── STEP 2: Documents ── */}
           {step === 2 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Upload Documents</h2>
-              <p className="text-gray-500 text-sm mb-6">
-                Upload your invoices, receipts, and any other supporting documents
-              </p>
-              <DocumentUpload
-                files={files}
-                onAdd={(newFiles) => setFiles(prev => [...prev, ...newFiles])}
-                onRemove={(i) => setFiles(prev => prev.filter((_, idx) => idx !== i))}
-                claimType={form.claimType}
-              />
-            </div>
+  <div>
+    <h2 className="text-lg font-bold text-gray-900 mb-1">Upload Documents</h2>
+    <p className="text-gray-500 text-sm mb-6">
+      Upload your invoices, receipts, and any other supporting documents
+    </p>
+    <DocumentUpload
+      files={files}
+      onAdd={(newFiles) => setFiles(prev => [...prev, ...newFiles])}
+      onRemove={(i) => setFiles(prev => prev.filter((_, idx) => idx !== i))}
+      claimType={form.claimType}
+    />
+  </div>
+)}
+
+
+{/* ── STEP 3: Review ── */}
+
+{step === 3 && (
+  <div>
+    <h2 className="text-lg font-bold text-gray-900 mb-1">Review & Submit</h2>
+    <p className="text-gray-500 text-sm mb-6">Please review your claim details before submitting</p>
+
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* Claim type */}
+      <div style={{ padding: '18px 20px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E5E7EB' }}>
+        <p style={{ fontSize: '10px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px' }}>Claim Type</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>{form.claimType}</span>
+          {form.isPreAuthorized && (
+            <span style={{ padding: '3px 10px', borderRadius: '999px', background: 'rgba(0,168,157,0.1)', color: '#00A89D', fontSize: '12px', fontWeight: 600 }}>Pre-authorized</span>
           )}
+          <span style={{ fontSize: '13px', color: '#6B7280' }}>· {form.treatmentCountry}</span>
+        </div>
+        {form.description && <p style={{ fontSize: '13px', color: '#6B7280', margin: '8px 0 0' }}>{form.description}</p>}
+      </div>
 
-          {/* ── STEP 3: Review ── */}
-          {step === 3 && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Review & Submit</h2>
-              <p className="text-gray-500 text-sm mb-6">
-                Please review your claim details before submitting
-              </p>
+      {/* Treatment + Provider 2 columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ padding: '18px 20px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E5E7EB' }}>
+          <p style={{ fontSize: '10px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>Treatment</p>
+          {[
+            ['Service date', form.serviceDate || '—'],
+            ['Service type', form.serviceType],
+            form.serviceLocation ? ['Location', form.serviceLocation] : null,
+            form.claimType === 'Inpatient' && form.admissionDate ? ['Admission', form.admissionDate] : null,
+            form.claimType === 'Inpatient' && form.dischargeDate ? ['Discharge', form.dischargeDate] : null,
+          ].filter((x): x is string[] => Array.isArray(x)).map(([k, v]) => (
+            <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#6B7280' }}>{k}</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', textAlign: 'right' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '18px 20px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E5E7EB' }}>
+          <p style={{ fontSize: '10px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>Provider</p>
+          {[
+            ['Name', form.providerName || '—'],
+            ['Type', form.providerType],
+            form.providerRegistration ? ['Reg. no.', form.providerRegistration] : null,
+          ].filter((x): x is string[] => Array.isArray(x)).map(([k, v]) => (
+            <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#6B7280' }}>{k}</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827', textAlign: 'right' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-              <div className="space-y-4">
-                {/* Claim type */}
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Claim Type
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900">{form.claimType}</span>
-                    {form.isPreAuthorized && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                            style={{ background: '#F2FAF9', color: '#00A89D' }}>
-                        Pre-authorized
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-500">· {form.treatmentCountry}</span>
-                  </div>
-                  {form.description && (
-                    <p className="text-sm text-gray-500 mt-1">{form.description}</p>
-                  )}
-                </div>
+      {/* Amount */}
+      <div style={{
+        padding: '22px 24px',
+        background: 'linear-gradient(135deg, rgba(0,168,157,0.07), rgba(0,168,157,0.13))',
+        borderRadius: '14px', border: '1.5px solid rgba(0,168,157,0.25)',
+      }}>
+        <p style={{ fontSize: '10px', fontWeight: 800, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Claim Amount</p>
+        <p style={{ fontSize: '36px', fontWeight: 900, color: '#003C3A', margin: '0 0 4px', letterSpacing: '-0.02em' }}>
+          {form.currency} {Number(form.totalAmount || 0).toFixed(2)}
+        </p>
+        <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+          Reimbursement to: <strong style={{ color: '#374151' }}>{form.reimbursementType}</strong>
+        </p>
+      </div>
 
-                {/* Treatment */}
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                    Treatment Details
-                  </p>
-                  <div className="grid grid-cols-2 gap-y-2 text-sm">
-                    <span className="text-gray-500">Service date:</span>
-                    <span className="font-medium text-gray-900">{form.serviceDate}</span>
-                    <span className="text-gray-500">Service type:</span>
-                    <span className="font-medium text-gray-900">{form.serviceType}</span>
-                    {form.serviceLocation && (<>
-                      <span className="text-gray-500">Location:</span>
-                      <span className="font-medium text-gray-900">{form.serviceLocation}</span>
-                    </>)}
-                    {form.claimType === 'Inpatient' && (<>
-                      <span className="text-gray-500">Admission:</span>
-                      <span className="font-medium text-gray-900">{form.admissionDate}</span>
-                      <span className="text-gray-500">Discharge:</span>
-                      <span className="font-medium text-gray-900">{form.dischargeDate}</span>
-                    </>)}
-                  </div>
-                </div>
-
-                {/* Provider */}
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                    Provider
-                  </p>
-                  <div className="grid grid-cols-2 gap-y-2 text-sm">
-                    <span className="text-gray-500">Name:</span>
-                    <span className="font-medium text-gray-900">{form.providerName}</span>
-                    <span className="text-gray-500">Type:</span>
-                    <span className="font-medium text-gray-900">{form.providerType}</span>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div className="p-4 rounded-xl border-2 border-teal-100"
-                     style={{ background: '#F2FAF9' }}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Claim Amount
-                  </p>
-                  <p className="text-2xl font-bold" style={{ color: '#003C3A' }}>
-                    {form.currency} {Number(form.totalAmount).toFixed(2)}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    Reimbursement to: {form.reimbursementType}
-                  </p>
-                </div>
-
-                {/* Documents */}
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Documents ({files.length})
-                  </p>
-                  {files.length === 0 ? (
-                    <p className="text-sm text-amber-600 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      No documents attached — your claim may be delayed
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {files.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <FileText className="w-4 h-4 text-teal-500" />
-                          <span className="text-gray-700 truncate">{f.file.name}</span>
-                          <span className="text-gray-400 text-xs">({f.docType})</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* GDPR Consent */}
-                <div className="p-4 border border-gray-200 rounded-xl">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" required id="gdpr"
-                           className="mt-0.5 rounded accent-teal-600" />
-                    <span className="text-xs text-gray-600">
-                      I confirm that all information provided is correct and I consent to Laya
-                      Healthcare processing this claim and my personal/medical data in accordance
-                      with their Privacy Policy and GDPR regulations.
-                    </span>
-                  </label>
-                </div>
+      {/* Documents */}
+      <div style={{ padding: '18px 20px', background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <p style={{ fontSize: '10px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>Documents</p>
+          <span style={{
+            fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px',
+            background: files.length > 0 ? 'rgba(0,168,157,0.1)' : '#FEF3C7',
+            color: files.length > 0 ? '#00A89D' : '#D97706',
+          }}>
+            {files.length} uploaded
+          </span>
+        </div>
+        {files.length === 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D97706', fontSize: '13px', fontWeight: 500 }}>
+            <AlertCircle size={15} /> No documents attached — your claim may be delayed
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {files.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'white', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
+                <FileText size={14} color='#00A89D' />
+                <span style={{ flex: 1, fontSize: '13px', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.file.name}</span>
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px', background: 'rgba(0,168,157,0.08)', color: '#00A89D', flexShrink: 0 }}>{f.docType}</span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* GDPR — interactive custom checkbox */}
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: '14px',
+        padding: '18px 20px',
+        border: `2px solid ${consent ? '#00A89D' : '#E5E7EB'}`,
+        borderRadius: '14px', cursor: 'pointer',
+        background: consent ? 'rgba(0,168,157,0.04)' : 'white',
+        transition: 'all 0.2s',
+      }}>
+        <div style={{
+          width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px',
+          border: `2px solid ${consent ? '#00A89D' : '#D1D5DB'}`,
+          background: consent ? '#00A89D' : 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 0.2s',
+        }}>
+          {consent && <CheckCircle2 size={13} color='white' strokeWidth={3} />}
+        </div>
+        <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ display: 'none' }} />
+        <span style={{ fontSize: '13px', color: '#4B5563', lineHeight: '1.6' }}>
+          I confirm that all information provided is correct and I consent to Laya
+          Healthcare processing this claim and my personal/medical data in accordance
+          with their Privacy Policy and GDPR regulations.
+        </span>
+      </label>
+
+    </div>
+  </div>
+)}
 
           {/* ── Navigation Buttons ── */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-            {step > 1 ? (
-              <button type="button" onClick={back}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
-                                 font-medium text-gray-600 bg-gray-100 hover:bg-gray-200
-                                 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Back
-              </button>
-            ) : (
-              <button type="button" onClick={() => router.push('/dashboard')}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
-                                 font-medium text-gray-500 hover:text-gray-700 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Cancel
-              </button>
-            )}
+  {step > 1 ? (
+    <button type="button" onClick={back} style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '10px 20px', borderRadius: '10px', border: 'none',
+      background: '#F3F4F6', color: '#4B5563', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+    }}>
+      <ChevronLeft size={16} /> Back
+    </button>
+  ) : (
+    <button type="button" onClick={() => router.push('/dashboard')} style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '10px 20px', borderRadius: '10px', border: 'none',
+      background: 'transparent', color: '#6B7280', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+    }}>
+      <ChevronLeft size={16} /> Cancel
+    </button>
+  )}
 
-            {step < STEPS.length ? (
-              <button type="button" onClick={next}
-                      disabled={step === 4 && !form.claimType}
-                      className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm
-                                 font-semibold text-white transition-all hover:-translate-y-0.5
-                                 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
-                      style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-                Continue <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button type="button" onClick={handleSubmit} disabled={submitting}
-                      className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm
-                                 font-semibold text-white transition-all hover:-translate-y-0.5
-                                 disabled:opacity-60 disabled:cursor-not-allowed"
-                      style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-                {submitting
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
-                  : <><CheckCircle2 className="w-4 h-4" /> Submit Claim</>}
-              </button>
-            )}
-          </div>
+  {step < 4 ? (
+    <button type="button" onClick={next} style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      padding: '11px 28px', borderRadius: '12px', border: 'none',
+      background: 'linear-gradient(135deg, #003C3A, #00A89D)',
+      color: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+      boxShadow: '0 4px 14px rgba(0,168,157,0.3)',
+    }}>
+      Continue <ChevronRight size={16} />
+    </button>
+  ) : (
+    <button type="button" onClick={handleSubmit} disabled={submitting || !consent} style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      padding: '11px 28px', borderRadius: '12px', border: 'none',
+      background: (submitting || !consent) ? '#E5E7EB' : 'linear-gradient(135deg, #003C3A, #00A89D)',
+      color: (submitting || !consent) ? '#9CA3AF' : 'white',
+      fontWeight: 700, fontSize: '14px',
+      cursor: (submitting || !consent) ? 'not-allowed' : 'pointer',
+      boxShadow: (submitting || !consent) ? 'none' : '0 4px 14px rgba(0,168,157,0.3)',
+      transition: 'all 0.2s',
+    }}>
+      {submitting
+        ? <><Loader2 size={16} className="animate-spin" /> Submitting...</>
+        : <><CheckCircle2 size={16} /> Submit Claim</>}
+    </button>
+  )}
+</div>
         </div>
       </div>
     </div>
