@@ -663,7 +663,6 @@ try {
       setSubmitting(false)
     }
   }
-
   // ── Success screen ──
   if (submitted) {
   return (
