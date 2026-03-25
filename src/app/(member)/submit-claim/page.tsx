@@ -411,6 +411,7 @@ export default function SubmitClaimPage() {
   const [submitted, setSubmitted] = useState(false)
   const [claimId, setClaimId] = useState('')
   const [consent, setConsent] = useState(false)
+  const [decisionResult, setDecisionResult] = useState<any>(null)
   
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -456,6 +457,7 @@ export default function SubmitClaimPage() {
       if (!user) { router.push('/login'); return }
 
       const newClaimId = generateClaimId()
+      
 
       // 1. Insert claim
       const { data: claim, error: claimErr } = await supabase
@@ -507,70 +509,111 @@ export default function SubmitClaimPage() {
         .single()
 
       if (claimErr) throw claimErr
-      if (!claim) throw new Error('No claim returned')
+if (!claim) throw new Error('No claim returned')
 
-// ── Send to decision engine ──
+// ── Send to FastAPI decision engine ──
 try {
-  const aiResponse = await fetch('/api/ai/assess-claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      claimData: {
-        member_id:             user.id,
-        policy_id:             'P-2001',
-        contact_email:         user.email,
-        claim_type:            form.claimType,
-        service_type:          form.serviceType,
-        treatment_country:     form.treatmentCountry,
-        description:           form.description,
-        service_date:          form.serviceDate,
-        admission_date:        form.admissionDate || null,
-        discharge_date:        form.dischargeDate || null,
-        provider_name:         form.providerName,
-        provider_type:         form.providerType,
-        provider_registration: form.providerRegistration || null,
-        amount_claimed_eur:    Number(form.totalAmount),
-        currency:              form.currency,
-        member_already_paid:   form.memberAlreadyPaid,
-        reimbursement_type:    form.reimbursementType,
-        account_holder_name:   form.accountHolderName || null,
-        iban:                  form.iban || null,
-        bic:                   form.bic || null,
-        document_types:        files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
-        is_pre_authorized:     form.isPreAuthorized,
-        declaration_confirmed: consent,
-        consent_medical_data:  consent,
-        terms_accepted:        consent,
-        is_accident_or_injury: form.isAccidentOrInjury,
-        is_pre_existing:       form.isPreExisting,
-      }
-    }),
-  })
+  const payload = {
+    member_id: 'M-1001',
+    policy_id: 'P-2001',
+    member_name: 'Aisha Khan',
+    contact_email: user.email || '',
+    contact_phone: user.user_metadata?.phone || null,
 
-  const aiResult = await aiResponse.json()
-  console.log('═══ AI DECISION ═══')
-  console.log('Decision:',  aiResult.decision)
-  console.log('Reason:',    aiResult.decision_reason)
-  console.log('Payable:',   aiResult.provisional_payable_eur)
-  console.log('Rule trace:', aiResult.rule_trace)
+    claim_type: form.claimType,
+    service_type: form.serviceType,
+    treatment_country: form.treatmentCountry === 'Abroad' ? 'Abroad' : 'Ireland',
+    short_description: form.description || null,
 
-  // Save AI result to Supabase
-  await supabase.from('claims')
+    service_date: form.serviceDate,
+    admission_date: form.admissionDate || null,
+    discharge_date: form.dischargeDate || null,
+
+    provider_name: form.providerName,
+    provider_type: form.providerType,
+    provider_registration_id: form.providerRegistration || null,
+
+    amount_claimed_eur: Number(form.totalAmount),
+    currency: form.currency,
+    member_already_paid: form.memberAlreadyPaid,
+    reimbursement_type: form.reimbursementType,
+    account_holder_name: form.accountHolderName || null,
+    iban: form.iban || null,
+    bic_swift: form.bic || null,
+
+    document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
+    pre_authorized: form.isPreAuthorized,
+
+    declaration_confirmed: consent,
+    consent_medical_data: consent,
+    terms_accepted: consent,
+
+    duplicate_claim: false,
+    is_accident_or_injury: form.isAccidentOrInjury,
+    is_pre_existing: form.isPreExisting,
+    is_experimental: false,
+    is_cosmetic: false,
+    infertility_related: false,
+    first_steps_fertility_benefit: false,
+
+    emergency_overseas: form.claimType === 'Emergency' && form.treatmentCountry === 'Abroad',
+    overseas_preapproved: form.treatmentCountry === 'Abroad' && form.isPreAuthorized,
+    low_confidence_ocr: false,
+    manual_fraud_flag: false,
+    fraud_confirmed: false,
+
+    submission_date: new Date().toISOString().split('T')[0],
+  }
+
+  console.log('Sending to FastAPI:', payload)
+
+  const decisionResponse = await fetch(
+    `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/evaluate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  )
+
+  const decisionResult = await decisionResponse.json()
+  setDecisionResult(decisionResult)
+
+  console.log('═══ FASTAPI DECISION ═══')
+  console.log(decisionResult)
+
+  if (!decisionResponse.ok) {
+    throw new Error(
+      decisionResult?.detail
+        ? JSON.stringify(decisionResult.detail)
+        : 'FastAPI claim evaluation failed'
+    )
+  }
+
+  await supabase
+    .from('claims')
     .update({
-      ai_decision:        aiResult.decision,
-      ai_decision_reason: aiResult.decision_reason,
-      ai_payable_amount:  aiResult.provisional_payable_eur,
-      ai_approved_amount: aiResult.approved_amount_eur,
-      routing: aiResult.decision === 'APPROVE'    ? 'auto_approved'
-             : aiResult.decision === 'REJECT'     ? 'auto_rejected'
-             : aiResult.decision === 'NEEDS_INFO' ? 'needs_info'
-             : 'manual_review',
+      ai_decision: decisionResult.decision,
+      ai_decision_reason: decisionResult.decision_explanation,
+      ai_payable_amount: decisionResult.estimated_payable_amount_eur,
+      ai_approved_amount: decisionResult.estimated_payable_amount_eur,
+      routing:
+        decisionResult.decision === 'APPROVE'
+          ? 'auto_approved'
+          : decisionResult.decision === 'REJECT'
+          ? 'auto_rejected'
+          : decisionResult.decision === 'NEEDS_INFO'
+          ? 'needs_info'
+          : decisionResult.decision === 'FRAUD_INVESTIGATION'
+          ? 'fraud_investigation'
+          : 'manual_review',
+      decision_result: decisionResult,
+      status: decisionResult.decision,
     })
     .eq('id', claim.id)
 
-} catch (aiErr) {
-  console.warn('AI failed silently:', aiErr)
-  // never block claim submission if AI is down
+} catch (decisionErr) {
+  console.warn('FastAPI decision engine failed:', decisionErr)
 }
 
       // 2. Upload documents to Supabase Storage
@@ -623,41 +666,220 @@ try {
 
   // ── Success screen ──
   if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-               style={{ background: '#F2FAF9' }}>
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-10 max-w-3xl w-full">
+        <div className="text-center mb-8">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: '#F2FAF9' }}
+          >
             <CheckCircle2 className="w-10 h-10" style={{ color: '#00A89D' }} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Claim Submitted!</h2>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Claim Submitted!
+          </h2>
+
           <p className="text-gray-500 mb-2">Your claim reference number is:</p>
-          <div className="inline-block px-4 py-2 rounded-xl font-mono font-bold text-lg mb-6"
-               style={{ background: '#F2FAF9', color: '#003C3A' }}>
+
+          <div
+            className="inline-block px-4 py-2 rounded-xl font-mono font-bold text-lg mb-4"
+            style={{ background: '#F2FAF9', color: '#003C3A' }}
+          >
             {claimId}
           </div>
-          <p className="text-gray-500 text-sm mb-8">
-            We have received your claim and it is now being processed. You will receive
-            an email confirmation shortly. Most claims are decided within 2 business days.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push('/claims')}
-              className="w-full py-3 rounded-xl text-white font-semibold text-sm"
-              style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}>
-              View My Claims
-            </button>
-            <button
-              onClick={() => { setSubmitted(false); setStep(1); setForm(initialForm); setFiles([]); setConsent(false) }}
-              className="w-full py-3 rounded-xl text-gray-600 font-semibold text-sm
-                         bg-gray-100 hover:bg-gray-200 transition-colors">
-              Submit Another Claim
-            </button>
+        </div>
+
+        {decisionResult && (
+          <div className="space-y-6">
+            {/* Main decision card */}
+            <div
+              className="rounded-2xl p-6 border"
+              style={{ background: '#F8FAFC', borderColor: '#E5E7EB' }}
+            >
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Claim Decision
+              </p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                {decisionResult.decision}
+              </h3>
+              <p className="text-gray-700 mb-3">
+                {decisionResult.decision_explanation}
+              </p>
+              <p className="text-sm text-gray-500">
+                {decisionResult.next_action_text}
+              </p>
+            </div>
+
+            {/* Payable amount */}
+            <div
+              className="rounded-2xl p-6 border"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0,168,157,0.07), rgba(0,168,157,0.13))',
+                borderColor: 'rgba(0,168,157,0.25)',
+              }}
+            >
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Estimated Payable Amount
+              </p>
+              <p className="text-3xl font-extrabold" style={{ color: '#003C3A' }}>
+                EUR {Number(decisionResult.estimated_payable_amount_eur || 0).toFixed(2)}
+              </p>
+            </div>
+
+            {/* Missing documents */}
+            {decisionResult.missing_documents?.length > 0 && (
+              <div className="rounded-2xl p-6 border bg-amber-50 border-amber-200">
+                <p className="text-sm font-bold text-amber-800 mb-3">
+                  Missing Documents
+                </p>
+                <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
+                  {decisionResult.missing_documents.map((doc: string, index: number) => (
+                    <li key={index}>{doc}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Rejected rules */}
+            {decisionResult.rejected_by_rules?.length > 0 && (
+              <div className="rounded-2xl p-6 border bg-red-50 border-red-200">
+                <p className="text-sm font-bold text-red-800 mb-3">
+                  Rejected By Rules
+                </p>
+                <div className="space-y-3">
+                  {decisionResult.rejected_by_rules.map((rule: any, index: number) => (
+                    <div key={index} className="bg-white rounded-xl p-4 border border-red-100">
+                      <p className="font-semibold text-red-700">
+                        {rule.rule_id} - {rule.rule_name}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Needs info rules */}
+            {decisionResult.needs_info_rules?.length > 0 && (
+              <div className="rounded-2xl p-6 border bg-yellow-50 border-yellow-200">
+                <p className="text-sm font-bold text-yellow-800 mb-3">
+                  More Information Needed
+                </p>
+                <div className="space-y-3">
+                  {decisionResult.needs_info_rules.map((rule: any, index: number) => (
+                    <div key={index} className="bg-white rounded-xl p-4 border border-yellow-100">
+                      <p className="font-semibold text-yellow-700">
+                        {rule.rule_id} - {rule.rule_name}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Review rules */}
+            {decisionResult.review_rules?.length > 0 && (
+              <div className="rounded-2xl p-6 border bg-blue-50 border-blue-200">
+                <p className="text-sm font-bold text-blue-800 mb-3">
+                  Review Flags
+                </p>
+                <div className="space-y-3">
+                  {decisionResult.review_rules.map((rule: any, index: number) => (
+                    <div key={index} className="bg-white rounded-xl p-4 border border-blue-100">
+                      <p className="font-semibold text-blue-700">
+                        {rule.rule_id} - {rule.rule_name}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fraud rules */}
+            {decisionResult.fraud_rules?.length > 0 && (
+              <div className="rounded-2xl p-6 border bg-purple-50 border-purple-200">
+                <p className="text-sm font-bold text-purple-800 mb-3">
+                  Fraud Investigation Flags
+                </p>
+                <div className="space-y-3">
+                  {decisionResult.fraud_rules.map((rule: any, index: number) => (
+                    <div key={index} className="bg-white rounded-xl p-4 border border-purple-100">
+                      <p className="font-semibold text-purple-700">
+                        {rule.rule_id} - {rule.rule_name}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Scorecard */}
+            {decisionResult.scorecard && (
+              <div className="rounded-2xl p-6 border bg-gray-50 border-gray-200">
+                <p className="text-sm font-bold text-gray-800 mb-4">Scorecard</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Fraud Score</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {decisionResult.scorecard.fraud_score}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Complexity Score</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {decisionResult.scorecard.complexity_score}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Anomaly Score</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {decisionResult.scorecard.anomaly_score}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Predicted Risk Level</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {decisionResult.scorecard.predicted_risk_level}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="space-y-3 mt-8">
+          <button
+            onClick={() => router.push('/claims')}
+            className="w-full py-3 rounded-xl text-white font-semibold text-sm"
+            style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}
+          >
+            View My Claims
+          </button>
+
+          <button
+            onClick={() => {
+              setSubmitted(false)
+              setStep(1)
+              setForm(initialForm)
+              setFiles([])
+              setConsent(false)
+              setDecisionResult(null)
+            }}
+            className="w-full py-3 rounded-xl text-gray-600 font-semibold text-sm bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            Submit Another Claim
+          </button>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   return (
     <div style={{ background: '#F8FAFA', minHeight: '100vh' }}>
