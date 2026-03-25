@@ -663,218 +663,188 @@ try {
       setSubmitting(false)
     }
   }
+  function getOutlook(decision: string) {
+  switch (decision) {
+    case 'APPROVE':             return { label: 'Very likely to be approved', segments: 4, color: '#0F6E56', bg: '#E1F5EE', border: '#9FE1CB' }
+    case 'HUMAN_REVIEW':        return { label: 'Good chance of approval',    segments: 3, color: '#0F6E56', bg: '#E1F5EE', border: '#9FE1CB' }
+    case 'NEEDS_INFO':          return { label: 'Action needed from you',     segments: 2, color: '#854F0B', bg: '#FAEEDA', border: '#FAC775' }
+    case 'REJECT':              return { label: 'Claim could not be approved',segments: 1, color: '#A32D2D', bg: '#FCEBEB', border: '#F7C1C1' }
+    case 'FRAUD_INVESTIGATION': return { label: 'We\'re reviewing your claim',segments: 2, color: '#854F0B', bg: '#FAEEDA', border: '#FAC775' }
+    default:                    return { label: 'Under review',               segments: 2, color: '#854F0B', bg: '#FAEEDA', border: '#FAC775' }
+  }
+}
   // ── Success screen ──
   if (submitted) {
+  const outlook = decisionResult ? getOutlook(decisionResult.decision) : null
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-lg p-10 max-w-3xl w-full">
-        <div className="text-center mb-8">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: '#F2FAF9' }}
-          >
-            <CheckCircle2 className="w-10 h-10" style={{ color: '#00A89D' }} />
+    <div style={{ minHeight: '100vh', background: '#F8FAFA', padding: '40px 24px' }}>
+      <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* ── Header ── */}
+        <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+            <CheckCircle2 size={24} color="#0F6E56" />
           </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Claim Submitted!
-          </h2>
-
-          <p className="text-gray-500 mb-2">Your claim reference number is:</p>
-
-          <div
-            className="inline-block px-4 py-2 rounded-xl font-mono font-bold text-lg mb-4"
-            style={{ background: '#F2FAF9', color: '#003C3A' }}
-          >
-            {claimId}
-          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#111827', margin: '0 0 6px' }}>Claim submitted</h2>
+          <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
+            Reference{' '}
+            <span style={{ fontFamily: 'monospace', background: '#F3F4F6', padding: '2px 8px', borderRadius: 6, color: '#374151', fontSize: 12 }}>
+              {claimId}
+            </span>
+          </p>
         </div>
 
-        {decisionResult && (
-          <div className="space-y-6">
-            {/* Main decision card */}
-            <div
-              className="rounded-2xl p-6 border"
-              style={{ background: '#F8FAFC', borderColor: '#E5E7EB' }}
-            >
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                Claim Decision
-              </p>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {decisionResult.decision}
-              </h3>
-              <p className="text-gray-700 mb-3">
-                {decisionResult.decision_explanation}
-              </p>
-              <p className="text-sm text-gray-500">
-                {decisionResult.next_action_text}
-              </p>
-            </div>
-
-            {/* Payable amount */}
-            <div
-              className="rounded-2xl p-6 border"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0,168,157,0.07), rgba(0,168,157,0.13))',
-                borderColor: 'rgba(0,168,157,0.25)',
-              }}
-            >
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Estimated Payable Amount
-              </p>
-              <p className="text-3xl font-extrabold" style={{ color: '#003C3A' }}>
-                EUR {Number(decisionResult.estimated_payable_amount_eur || 0).toFixed(2)}
-              </p>
-            </div>
-
-            {/* Missing documents */}
-            {decisionResult.missing_documents?.length > 0 && (
-              <div className="rounded-2xl p-6 border bg-amber-50 border-amber-200">
-                <p className="text-sm font-bold text-amber-800 mb-3">
-                  Missing Documents
-                </p>
-                <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
-                  {decisionResult.missing_documents.map((doc: string, index: number) => (
-                    <li key={index}>{doc}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Rejected rules */}
-            {decisionResult.rejected_by_rules?.length > 0 && (
-              <div className="rounded-2xl p-6 border bg-red-50 border-red-200">
-                <p className="text-sm font-bold text-red-800 mb-3">
-                  Rejected By Rules
-                </p>
-                <div className="space-y-3">
-                  {decisionResult.rejected_by_rules.map((rule: any, index: number) => (
-                    <div key={index} className="bg-white rounded-xl p-4 border border-red-100">
-                      <p className="font-semibold text-red-700">
-                        {rule.rule_id} - {rule.rule_name}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
-                    </div>
-                  ))}
+        {decisionResult && outlook && (
+          <>
+            {/* ── Approval outlook ── */}
+            <div style={{ padding: '20px', borderRadius: 14, background: outlook.bg, border: `1.5px solid ${outlook.border}` }}>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6B7280', margin: '0 0 8px' }}>Approval outlook</p>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <p style={{ fontSize: 18, fontWeight: 600, color: '#111827', margin: '0 0 3px' }}>{outlook.label}</p>
+                  <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>{decisionResult.next_action_text}</p>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                  <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 2px' }}>estimated</p>
+                  <p style={{ fontSize: 26, fontWeight: 700, color: outlook.color, margin: 0 }}>
+                    EUR {Number(decisionResult.estimated_payable_amount_eur || 0).toFixed(2)}
+                  </p>
                 </div>
               </div>
-            )}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                {[1,2,3,4].map(i => (
+                  <div key={i} style={{
+                    flex: 1, height: 8, borderRadius: 999,
+                    background: i <= outlook.segments ? outlook.color : '#E5E7EB',
+                    opacity: i <= outlook.segments ? (0.4 + i * 0.15) : 1,
+                  }} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, color: '#9CA3AF' }}>Unlikely</span>
+                <span style={{ fontSize: 11, color: outlook.color, fontWeight: 500 }}>{outlook.label}</span>
+                <span style={{ fontSize: 11, color: '#9CA3AF' }}>Approved</span>
+              </div>
+            </div>
 
-            {/* Needs info rules */}
+            {/* ── Action needed ── */}
             {decisionResult.needs_info_rules?.length > 0 && (
-              <div className="rounded-2xl p-6 border bg-yellow-50 border-yellow-200">
-                <p className="text-sm font-bold text-yellow-800 mb-3">
-                  More Information Needed
-                </p>
-                <div className="space-y-3">
-                  {decisionResult.needs_info_rules.map((rule: any, index: number) => (
-                    <div key={index} className="bg-white rounded-xl p-4 border border-yellow-100">
-                      <p className="font-semibold text-yellow-700">
-                        {rule.rule_id} - {rule.rule_name}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
-                    </div>
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFBEB', border: '1.5px solid #FAC775' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 10px' }}>Action needed to proceed</p>
+                {decisionResult.needs_info_rules.map((rule: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < decisionResult.needs_info_rules.length - 1 ? 8 : 0 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D97706', marginTop: 5, flexShrink: 0 }} />
+                    <p style={{ fontSize: 13, color: '#78350F', margin: 0 }}>{rule.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Missing documents ── */}
+            {decisionResult.missing_documents?.length > 0 && (
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFBEB', border: '1.5px solid #FAC775' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 10px' }}>Please also upload</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {decisionResult.missing_documents.map((doc: string, i: number) => (
+                    <span key={i} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999, background: 'white', border: '1px solid #FDE68A', color: '#B45309', fontWeight: 500 }}>
+                      {doc}
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Review rules */}
+            {/* ── Review flags ── */}
             {decisionResult.review_rules?.length > 0 && (
-              <div className="rounded-2xl p-6 border bg-blue-50 border-blue-200">
-                <p className="text-sm font-bold text-blue-800 mb-3">
-                  Review Flags
-                </p>
-                <div className="space-y-3">
-                  {decisionResult.review_rules.map((rule: any, index: number) => (
-                    <div key={index} className="bg-white rounded-xl p-4 border border-blue-100">
-                      <p className="font-semibold text-blue-700">
-                        {rule.rule_id} - {rule.rule_name}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#F8FAFC', border: '1px solid #E5E7EB' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 10px' }}>One thing to check</p>
+                {decisionResult.review_rules.map((rule: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < decisionResult.review_rules.length - 1 ? 8 : 0 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#9CA3AF', marginTop: 5, flexShrink: 0 }} />
+                    <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>{rule.message}</p>
+                  </div>
+                ))}
+                <p style={{ fontSize: 12, color: '#9CA3AF', margin: '10px 0 0' }}>Our team will look into this — no action needed from you right now.</p>
               </div>
             )}
 
-            {/* Fraud rules */}
-            {decisionResult.fraud_rules?.length > 0 && (
-              <div className="rounded-2xl p-6 border bg-purple-50 border-purple-200">
-                <p className="text-sm font-bold text-purple-800 mb-3">
-                  Fraud Investigation Flags
-                </p>
-                <div className="space-y-3">
-                  {decisionResult.fraud_rules.map((rule: any, index: number) => (
-                    <div key={index} className="bg-white rounded-xl p-4 border border-purple-100">
-                      <p className="font-semibold text-purple-700">
-                        {rule.rule_id} - {rule.rule_name}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">{rule.message}</p>
-                    </div>
-                  ))}
-                </div>
+            {/* ── Rejection reason ── */}
+            {decisionResult.rejected_by_rules?.length > 0 && (
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: '0 0 10px' }}>Why this claim wasn't approved</p>
+                {decisionResult.rejected_by_rules.map((rule: any, i: number) => (
+                  <p key={i} style={{ fontSize: 13, color: '#7F1D1D', margin: i > 0 ? '8px 0 0' : 0 }}>{rule.message}</p>
+                ))}
               </div>
             )}
 
-            {/* Scorecard */}
-            {decisionResult.scorecard && (
-              <div className="rounded-2xl p-6 border bg-gray-50 border-gray-200">
-                <p className="text-sm font-bold text-gray-800 mb-4">Scorecard</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Fraud Score</p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {decisionResult.scorecard.fraud_score}
-                    </p>
+            {/* ── What happens next ── */}
+            <div style={{ padding: '16px 20px', borderRadius: 14, background: 'white', border: '1px solid #E5E7EB' }}>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#9CA3AF', margin: '0 0 14px' }}>What happens next</p>
+              {[
+                { label: 'Claim received', sub: 'Today', done: true },
+                { label: 'Under review', sub: 'Usually 3–5 business days', done: false, active: true },
+                { label: 'Decision & payment', sub: "We'll email you either way", done: false },
+              ].map((s, i, arr) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
+                      background: s.done ? '#E1F5EE' : s.active ? '#003C3A' : '#F3F4F6',
+                      color: s.done ? '#0F6E56' : s.active ? 'white' : '#9CA3AF',
+                    }}>
+                      {s.done ? <CheckCircle2 size={13} /> : i + 1}
+                    </div>
+                    <div style={{ paddingBottom: i < arr.length - 1 ? 16 : 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: s.done || s.active ? '#111827' : '#9CA3AF', margin: '0 0 2px' }}>{s.label}</p>
+                      <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>{s.sub}</p>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Complexity Score</p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {decisionResult.scorecard.complexity_score}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Anomaly Score</p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {decisionResult.scorecard.anomaly_score}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Predicted Risk Level</p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {decisionResult.scorecard.predicted_risk_level}
-                    </p>
-                  </div>
+                  {i < arr.length - 1 && (
+                    <div style={{ width: 1, height: 20, background: '#E5E7EB', marginLeft: 11 }} />
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          </>
         )}
 
-        <div className="space-y-3 mt-8">
-          <button
-            onClick={() => router.push('/claims')}
-            className="w-full py-3 rounded-xl text-white font-semibold text-sm"
-            style={{ background: 'linear-gradient(135deg, #003C3A, #00A89D)' }}
-          >
-            View My Claims
-          </button>
-
-          <button
-            onClick={() => {
-              setSubmitted(false)
-              setStep(1)
-              setForm(initialForm)
-              setFiles([])
-              setConsent(false)
-              setDecisionResult(null)
-            }}
-            className="w-full py-3 rounded-xl text-gray-600 font-semibold text-sm bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            Submit Another Claim
-          </button>
+        {/* ── Claim summary ── */}
+        <div style={{ padding: '16px 20px', borderRadius: 14, background: 'white', border: '1px solid #E5E7EB' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#9CA3AF', margin: '0 0 12px' }}>Claim summary</p>
+          {[
+            ['Type', form.claimType],
+            ['Provider', form.providerName],
+            ['Service date', form.serviceDate],
+            ['Amount claimed', `${form.currency} ${Number(form.totalAmount).toFixed(2)}`],
+            ['Documents', `${files.length} uploaded`],
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid #F3F4F6' }}>
+              <span style={{ fontSize: 13, color: '#6B7280' }}>{k}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{v}</span>
+            </div>
+          ))}
         </div>
+
+        {/* ── Buttons ── */}
+        <button onClick={() => router.push('/claims')} style={{
+          width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+          background: 'linear-gradient(135deg, #003C3A, #00A89D)', color: 'white',
+          fontSize: 14, fontWeight: 600, cursor: 'pointer',
+        }}>
+          View my claims
+        </button>
+        <button onClick={() => { setSubmitted(false); setStep(1); setForm(initialForm); setFiles([]); setConsent(false); setDecisionResult(null) }} style={{
+          width: '100%', padding: '13px', borderRadius: 12,
+          border: '1px solid #E5E7EB', background: 'white',
+          fontSize: 14, fontWeight: 500, color: '#6B7280', cursor: 'pointer',
+          marginBottom: '8px',
+        }}>
+          Submit another claim
+        </button>
+
       </div>
     </div>
   )
