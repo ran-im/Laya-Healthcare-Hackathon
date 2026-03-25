@@ -509,53 +509,69 @@ export default function SubmitClaimPage() {
       if (claimErr) throw claimErr
       if (!claim) throw new Error('No claim returned')
 
-        // ── Send to decision engine ──
-const aiResponse = await fetch('/api/ai/assess-claim', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    claimData: {
-      claim_id:              newClaimId,
-      member_id:             user.id,
-      policy_id:             null,
-      claim_type:            form.claimType,
-      service_type:          form.serviceType,
-      provider_name:         form.providerName,
-      treatment_country:     form.treatmentCountry,
-      service_date:          form.serviceDate,
-      admission_date:        form.admissionDate || null,
-      discharge_date:        form.dischargeDate || null,
-      amount_claimed_eur:    Number(form.totalAmount),
-      member_already_paid:   form.memberAlreadyPaid,
-      reimbursement_type:    form.reimbursementType,
-      document_types:        files.map(f => f.docType.toLowerCase()),
-      declaration_confirmed: consent,
-      consent_medical_data:  consent,
-      terms_accepted:        consent,
-      is_accident_or_injury: form.isAccidentOrInjury,
-      is_pre_existing:       form.isPreExisting,
-      overseas_preapproved:  form.treatmentCountry === 'Abroad' && form.isPreAuthorized,
-    }
-  }),
-})
-
-const aiResult = await aiResponse.json()
-console.log('AI Decision:', aiResult.decision, '|', aiResult.decision_reason)
-
-// ── Save AI result to Supabase ──
-await supabase.from('claims')
-  .update({
-    ai_decision:        aiResult.decision,
-    ai_decision_reason: aiResult.decision_reason,
-    ai_payable_amount:  aiResult.provisional_payable_eur,
-    ai_approved_amount: aiResult.approved_amount_eur,
-    routing: aiResult.decision === 'APPROVE'    ? 'auto_approved'
-           : aiResult.decision === 'REJECT'     ? 'auto_rejected'
-           : aiResult.decision === 'NEEDS_INFO' ? 'needs_info'
-           : 'manual_review',
+// ── Send to decision engine ──
+try {
+  const aiResponse = await fetch('/api/ai/assess-claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      claimData: {
+        member_id:             user.id,
+        policy_id:             'P-2001',
+        contact_email:         user.email,
+        claim_type:            form.claimType,
+        service_type:          form.serviceType,
+        treatment_country:     form.treatmentCountry,
+        description:           form.description,
+        service_date:          form.serviceDate,
+        admission_date:        form.admissionDate || null,
+        discharge_date:        form.dischargeDate || null,
+        provider_name:         form.providerName,
+        provider_type:         form.providerType,
+        provider_registration: form.providerRegistration || null,
+        amount_claimed_eur:    Number(form.totalAmount),
+        currency:              form.currency,
+        member_already_paid:   form.memberAlreadyPaid,
+        reimbursement_type:    form.reimbursementType,
+        account_holder_name:   form.accountHolderName || null,
+        iban:                  form.iban || null,
+        bic:                   form.bic || null,
+        document_types:        files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
+        is_pre_authorized:     form.isPreAuthorized,
+        declaration_confirmed: consent,
+        consent_medical_data:  consent,
+        terms_accepted:        consent,
+        is_accident_or_injury: form.isAccidentOrInjury,
+        is_pre_existing:       form.isPreExisting,
+      }
+    }),
   })
-  .eq('id', claim.id)
 
+  const aiResult = await aiResponse.json()
+  console.log('═══ AI DECISION ═══')
+  console.log('Decision:',  aiResult.decision)
+  console.log('Reason:',    aiResult.decision_reason)
+  console.log('Payable:',   aiResult.provisional_payable_eur)
+  console.log('Rule trace:', aiResult.rule_trace)
+
+  // Save AI result to Supabase
+  await supabase.from('claims')
+    .update({
+      ai_decision:        aiResult.decision,
+      ai_decision_reason: aiResult.decision_reason,
+      ai_payable_amount:  aiResult.provisional_payable_eur,
+      ai_approved_amount: aiResult.approved_amount_eur,
+      routing: aiResult.decision === 'APPROVE'    ? 'auto_approved'
+             : aiResult.decision === 'REJECT'     ? 'auto_rejected'
+             : aiResult.decision === 'NEEDS_INFO' ? 'needs_info'
+             : 'manual_review',
+    })
+    .eq('id', claim.id)
+
+} catch (aiErr) {
+  console.warn('AI failed silently:', aiErr)
+  // never block claim submission if AI is down
+}
 
       // 2. Upload documents to Supabase Storage
       for (const uf of files) {
@@ -1128,3 +1144,4 @@ await supabase.from('claims')
     </div>
   )
 }
+

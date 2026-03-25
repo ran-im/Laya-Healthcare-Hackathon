@@ -18,6 +18,9 @@ interface Claim {
   id: string; claim_id: string; claim_type: string; status: string
   provider_name: string; total_amount: number; currency: string
   service_date: string; created_at: string
+  ai_decision: string | null
+  ai_decision_reason: string | null
+  ai_payable_amount: number | null
 }
 interface Notification {
   id: string; title: string; message: string
@@ -170,7 +173,31 @@ export default function DashboardPage() {
                     </div>
                     <div style={{ textAlign:'right', flexShrink:0 }}>
                       <div style={{ fontWeight:700, fontSize:'13px', color:'#111827', marginBottom:'5px' }}>{fmt(claim.total_amount)}</div>
-                      <span style={{ display:'inline-flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:500, padding:'3px 8px', borderRadius:'999px', background: sc.bg, color: sc.color }}>{claim.status}</span>
+                      {claim.ai_decision && (
+  <span style={{
+    fontSize: '11px', fontWeight: 700,
+    padding: '2px 8px', borderRadius: '999px',
+    marginLeft: '6px',
+    background: claim.ai_decision === 'APPROVE'    ? '#ECFDF5'
+              : claim.ai_decision === 'REJECT'     ? '#FEF2F2'
+              : claim.ai_decision === 'NEEDS_INFO' ? '#F5F3FF'
+              : '#FFFBEB',
+    color:      claim.ai_decision === 'APPROVE'    ? '#059669'
+              : claim.ai_decision === 'REJECT'     ? '#DC2626'
+              : claim.ai_decision === 'NEEDS_INFO' ? '#7C3AED'
+              : '#D97706',
+  }}>
+    {claim.ai_decision === 'APPROVE'    ? '✓ AI Approved'
+   : claim.ai_decision === 'REJECT'     ? '✗ AI Rejected'
+   : claim.ai_decision === 'NEEDS_INFO' ? '📋 Info Needed'
+   : '👤 Under Review'}
+  </span>
+)}
+{claim.ai_payable_amount != null && claim.ai_payable_amount > 0 && (
+  <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '6px' }}>
+    Est. {fmt(claim.ai_payable_amount)}
+  </span>
+)}
                     </div>
                     <ChevronRight size={15} color="#E5E7EB" />
                   </div>

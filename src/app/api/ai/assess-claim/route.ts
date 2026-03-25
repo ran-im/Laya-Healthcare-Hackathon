@@ -4,80 +4,71 @@ export async function POST(req: NextRequest) {
   try {
     const { claimData } = await req.json()
 
+    // Map exactly to ClaimSubmission fields in decision_engine.py
     const payload = {
-      claim_id:                       claimData.claim_id,
-      member_id:                       claimData.member_id,
-      policy_id:                       claimData.policy_id || null,
-      member_status:                   'Active',
-      member_residency_country:        claimData.treatment_country,
-      membership_start_date:           null,
-      prior_cover_credit_weeks:        0,
-      prior_cover_credit_years:        0,
-      weeks_since_upgrade:             0,
-      previous_benefit_level:          1,
-      current_benefit_level:           1,
-      member_age:                      null,
-      claim_type:                      claimData.claim_type,
-      service_type:                    claimData.service_type,
-      provider_name:                   claimData.provider_name,
-      provider_registered:             true,
-      hospital_is_participating:       true,
-      service_date:                    claimData.service_date,
-      submission_date:                 new Date().toISOString().split('T')[0],
-      admission_date:                  claimData.admission_date || null,
-      discharge_date:                  claimData.discharge_date || null,
-      claim_days:                      0,
-      amount_claimed_eur:              claimData.amount_claimed_eur,
-      member_has_paid:                 claimData.member_already_paid,
-      reimbursement_type:              claimData.reimbursement_type,
-      documents:                       claimData.document_types,
-      missing_documents_text:          '',
-      declarations_confirmed:          claimData.declaration_confirmed,
-      medical_data_consent:            claimData.consent_medical_data,
-      privacy_terms_accepted:          claimData.terms_accepted,
-      duplicate_claim:                 false,
-      claim_form_complete:             true,
-      days_since_follow_up:            0,
-      claim_cause:                     claimData.is_accident_or_injury ? 'Accident' : 'Illness',
-      is_pre_existing_condition:       claimData.is_pre_existing,
-      is_experimental_treatment:       false,
-      is_cosmetic_treatment:           false,
-      is_disfigurement_correction:     false,
-      no_underlying_condition:         false,
-      treatment_country:               claimData.treatment_country,
-      is_emergency:                    claimData.claim_type === 'Emergency',
-      preapproved_overseas_treatment:  claimData.overseas_preapproved,
-      clinical_indicators_required:    false,
-      clinical_indicators_provided:    true,
-      has_other_insurance_cover:       false,
-      investigation_finding:           '',
-      fraud_score:                     0.10,
-      complexity_score:                0.30,
-      anomaly_score:                   0.10,
-      risk_level:                      'Low',
-      member_total_op_claims_ytd:      0,
-      member_annual_op_cap:            1000,
-      op_excess_remaining:             25,
-      member_total_inpatient_daycase_days_ytd: 0,
-      psychiatric_days_this_year:      0,
-      pregnancy_weeks_at_treatment:    null,
-      provider_is_family_member:       false,
-      vaccine_or_preventive:           false,
-      is_maternity:                    false,
-      is_infertility:                  false,
-      is_first_steps_fertility:        false,
-      low_confidence_ocr:              false,
-      manual_fraud_flag:               false,
+      member_id:                    claimData.member_id,
+      policy_id:                    claimData.policy_id || 'UNKNOWN',
+      member_name:                  claimData.member_name || null,
+      contact_email:                claimData.contact_email || 'unknown@email.com',
+      contact_phone:                null,
+
+      claim_type:                   claimData.claim_type,
+      service_type:                 claimData.service_type,
+      treatment_country:            claimData.treatment_country || 'Ireland',
+      short_description:            claimData.description || null,
+
+      service_date:                 claimData.service_date,
+      admission_date:               claimData.admission_date || null,
+      discharge_date:               claimData.discharge_date || null,
+
+      provider_name:                claimData.provider_name,
+      provider_type:                claimData.provider_type,
+      provider_registration_id:     claimData.provider_registration || null,
+
+      amount_claimed_eur:           claimData.amount_claimed_eur,
+      currency:                     claimData.currency || 'EUR',
+      member_already_paid:          claimData.member_already_paid ?? true,
+      reimbursement_type:           claimData.reimbursement_type || 'Pay member',
+      account_holder_name:          claimData.account_holder_name || null,
+      iban:                         claimData.iban || null,
+      bic_swift:                    claimData.bic || null,
+
+      document_types:               claimData.document_types || [],
+      pre_authorized:               claimData.is_pre_authorized ?? false,
+
+      declaration_confirmed:        claimData.declaration_confirmed ?? true,
+      consent_medical_data:         claimData.consent_medical_data ?? true,
+      terms_accepted:               claimData.terms_accepted ?? true,
+
+      duplicate_claim:              false,
+      is_accident_or_injury:        claimData.is_accident_or_injury ?? false,
+      is_pre_existing:              claimData.is_pre_existing ?? false,
+      is_experimental:              false,
+      is_cosmetic:                  false,
+      infertility_related:          false,
+      first_steps_fertility_benefit: false,
+
+      emergency_overseas:           claimData.claim_type === 'Emergency' && claimData.treatment_country === 'Abroad',
+      overseas_preapproved:         claimData.treatment_country === 'Abroad' && claimData.is_pre_authorized,
+      low_confidence_ocr:           false,
+      manual_fraud_flag:            false,
+      fraud_confirmed:              false,
+
+      submission_date:              new Date().toISOString().split('T')[0],
     }
 
     const engineUrl = process.env.DECISION_ENGINE_URL || 'http://localhost:8000'
+
     const response = await fetch(`${engineUrl}/api/claims/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
 
-    if (!response.ok) throw new Error(`Engine error: ${response.status}`)
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Engine error ${response.status}: ${errorText}`)
+    }
 
     const result = await response.json()
 
@@ -97,8 +88,8 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Decision engine error:', err)
     return NextResponse.json({
-      decision:        'REVIEW',
-      decision_reason: 'AI model unavailable — sent to manual review',
+      decision:                'REVIEW',
+      decision_reason:         'AI model unavailable — sent to manual review',
       provisional_payable_eur: 0,
       approved_amount_eur:     0,
       rule_trace:              [],

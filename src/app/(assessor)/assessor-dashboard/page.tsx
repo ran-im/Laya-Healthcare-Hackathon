@@ -20,6 +20,9 @@ interface Claim {
   ai_summary: string | null
   member_id: string
   profiles?: { full_name: string; member_id: string }
+  ai_decision: string | null
+  ai_decision_reason: string | null
+ai_payable_amount: number | null
 }
 
 interface Stats {
@@ -39,10 +42,10 @@ function priorityStyle(p: string) {
 
 function routingStyle(r: string) {
   const map: Record<string, { color: string; bg: string; label: string }> = {
-    'auto_approve': { color: '#059669', bg: '#ECFDF5', label: '✓ Auto-Approve' },
-    'manual':       { color: '#D97706', bg: '#FFFBEB', label: '👤 Manual Review' },
-    'fraud':        { color: '#DC2626', bg: '#FEF2F2', label: '🚨 Fraud Review' },
-    'pending':      { color: '#6B7280', bg: '#F3F4F6', label: '⏳ Pending' },
+    'auto_approved':  { color: '#059669', bg: '#ECFDF5', label: '✓ Auto-Approved' },
+'manual_review':  { color: '#D97706', bg: '#FFFBEB', label: '👤 Manual Review' },
+'auto_rejected':  { color: '#DC2626', bg: '#FEF2F2', label: '✗ Auto-Rejected' },
+'needs_info':     { color: '#7C3AED', bg: '#F5F3FF', label: '📋 Needs Info' },
   }
   return map[r] || { color: '#6B7280', bg: '#F9FAFB', label: r }
 }
@@ -347,7 +350,7 @@ export default function AssessorDashboardPage() {
                         gridTemplateColumns:'1.8fr 1fr 0.9fr 0.9fr 1fr 1fr 1fr 120px',
                         padding:'11px 20px', background:'#F9FAFB',
                         borderBottom:'1px solid #F3F4F6', gap:'10px' }}>
-            {['Member / Claim','Type','Amount','Date','Routing','AI Scores','Status','Actions'].map(h => (
+            {['Member / Claim','Type','Amount','Date','Routing','AI Decision','AI Scores','Status','Actions'].map(h => (
               <div key={h} style={{ fontSize:'11px', fontWeight:600, color:'#9CA3AF',
                                     textTransform:'uppercase', letterSpacing:'0.5px' }}>
                 {h}
@@ -378,7 +381,7 @@ export default function AssessorDashboardPage() {
               return (
                 <div key={claim.id}
                   style={{
-                    display:'grid', gridTemplateColumns:'1.8fr 1fr 0.9fr 0.9fr 1fr 1fr 1fr 120px',
+                    display:'grid', gridTemplateColumns:'1.6fr 0.9fr 0.8fr 0.8fr 1fr 1.2fr 1fr 0.9fr 110px',
                     padding:'14px 20px', gap:'10px', alignItems:'center',
                     borderBottom: i < filtered.length - 1 ? '1px solid #F9FAFB' : 'none',
                     background: isFraudRisk ? '#FFF8F8' : 'white',
@@ -428,7 +431,45 @@ export default function AssessorDashboardPage() {
                       {rs.label}
                     </span>
                   </div>
-
+                  {/* AI Decision */}
+<div>
+  {claim.ai_decision ? (
+    <div>
+      <span style={{
+        fontSize: '11px', fontWeight: 700, padding: '3px 8px',
+        borderRadius: '999px', display: 'inline-block', marginBottom: '4px',
+        background: claim.ai_decision === 'APPROVE'    ? '#ECFDF5'
+                  : claim.ai_decision === 'REJECT'     ? '#FEF2F2'
+                  : claim.ai_decision === 'NEEDS_INFO' ? '#F5F3FF'
+                  : '#FFFBEB',
+        color:      claim.ai_decision === 'APPROVE'    ? '#059669'
+                  : claim.ai_decision === 'REJECT'     ? '#DC2626'
+                  : claim.ai_decision === 'NEEDS_INFO' ? '#7C3AED'
+                  : '#D97706',
+      }}>
+        {claim.ai_decision === 'APPROVE'    ? '✓ Approve'
+       : claim.ai_decision === 'REJECT'     ? '✗ Reject'
+       : claim.ai_decision === 'NEEDS_INFO' ? '📋 Info Needed'
+       : '👤 Review'}
+      </span>
+      {claim.ai_payable_amount != null && claim.ai_payable_amount > 0 && (
+        <div style={{ fontSize: '11px', color: '#6B7280' }}>
+          Pay: {fmt(claim.ai_payable_amount)}
+        </div>
+      )}
+      {claim.ai_decision_reason && (
+        <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      maxWidth: '140px' }}
+             title={claim.ai_decision_reason}>
+          {claim.ai_decision_reason}
+        </div>
+      )}
+    </div>
+  ) : (
+    <span style={{ fontSize: '11px', color: '#D1D5DB' }}>—</span>
+  )}
+</div>
                   {/* AI Scores */}
                   <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
