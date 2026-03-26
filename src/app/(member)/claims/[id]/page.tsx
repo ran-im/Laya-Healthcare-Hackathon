@@ -92,6 +92,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
   const status = STATUS_STYLE[claim.status] || STATUS_STYLE['Submitted']
   const fraudPct = Math.round((claim.fraud_score || 0) * 100)
   const complexPct = Math.round((claim.complexity_score || 0) * 100)
+  const engine = claim?.decision_result as any | null
 
   return (
     <div style={{ background: '#F8FAFA', minHeight: '100vh' }}>
@@ -119,8 +120,52 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 24px' }}>
-        {/* Rejection notice */}
-        {claim.status === 'Rejected' && (
+        {/* Decision explanation */}
+        {engine?.decision_explanation && (
+          <div style={{ background: '#F8FAFB', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Decision</h3>
+            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{engine.decision_explanation}</p>
+          </div>
+        )}
+
+        {/* Next action */}
+        {engine?.next_action_text && (
+          <div style={{ background: '#F8FAFB', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Next step</h3>
+            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{engine.next_action_text}</p>
+          </div>
+        )}
+
+        {/* Missing documents */}
+        {engine?.missing_documents?.length > 0 && (
+          <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: 700, color: '#EA580C' }}>Missing documents</h3>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#7C2D12', fontSize: '14px' }}>
+              {engine.missing_documents.map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Missing information */}
+        {engine?.missing_information?.length > 0 && (
+          <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: 700, color: '#EA580C' }}>More information needed</h3>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#7C2D12', fontSize: '14px' }}>
+              {engine.missing_information.map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Estimated payable amount */}
+        {engine?.estimated_payable_amount_eur !== undefined && engine.estimated_payable_amount_eur !== null && (
+          <div style={{ background: '#ECFDF5', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: '#059669' }}>Estimated payable amount</h3>
+            <p style={{ marginBottom: 0, fontSize: '20px', fontWeight: 700, color: '#059669' }}>€{Number(engine.estimated_payable_amount_eur).toFixed(2)}</p>
+          </div>
+        )}
+
+        {/* Rejection notice (legacy fallback) */}
+        {claim.status === 'Rejected' && !engine?.decision_explanation && (
           <div style={{ background: '#FEF2F2', border: '2px solid #FECACA', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>❌</span>
@@ -131,8 +176,8 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* Info required notice */}
-        {claim.status === 'Info Required' && (
+        {/* Info required notice (legacy fallback) */}
+        {claim.status === 'Info Required' && !engine?.missing_documents?.length && !engine?.missing_information?.length && (
           <div style={{ background: '#FFF7ED', border: '2px solid #FED7AA', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>⚠️</span>
