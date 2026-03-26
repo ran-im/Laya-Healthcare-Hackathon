@@ -3,6 +3,18 @@
 -- Enables: members see own claims, staff see all, proper isolation
 
 -- ─────────────────────────────────────────
+-- ADD MISSING COLUMNS TO PROFILES
+-- ─────────────────────────────────────────
+alter table public.profiles add column if not exists member_id text;
+alter table public.profiles add column if not exists policy_id text;
+
+-- Set demo member data
+update public.profiles
+set member_id = 'M-1001',
+    policy_id = 'P-2001'
+where email = 'member@laya-demo.com';
+
+-- ─────────────────────────────────────────
 -- ENABLE RLS on all tables
 -- ─────────────────────────────────────────
 alter table public.claims enable row level security;

@@ -13,14 +13,16 @@ export async function GET() {
     {
       email: 'member@laya-demo.com',
       password: 'Demo1234!',
-      full_name: 'Sarah Murphy',
+      full_name: 'Aisha Khan',
       role: 'member',
       plan_name: 'Premium Health',
+      member_id: 'M-1001',
+      policy_id: 'P-2001',
     },
     {
       email: 'assessor@laya-demo.com',
       password: 'Demo1234!',
-      full_name: 'James O\'Brien',
+      full_name: "James O'Brien",
       role: 'assessor',
       plan_name: 'Staff',
     },
@@ -71,6 +73,8 @@ export async function GET() {
                 full_name: u.full_name,
                 role: u.role,
                 plan_name: u.plan_name,
+                member_id: u.member_id ?? null,
+                policy_id: u.policy_id ?? null,
               })
             results.push({ email: u.email, status: 'updated' })
           }
@@ -87,6 +91,8 @@ export async function GET() {
             full_name: u.full_name,
             role: u.role,
             plan_name: u.plan_name,
+            member_id: u.member_id ?? null,
+            policy_id: u.policy_id ?? null,
           })
         results.push({ email: u.email, status: 'created' })
       }

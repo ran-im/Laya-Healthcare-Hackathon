@@ -32,6 +32,18 @@ const REQUIRED_DOCS: Record<string, string[]> = {
   Optical:    ['Invoice', 'Receipt'],
 }
 
+const demoFallbackByEmail: Record<string, {
+  member_id: string
+  policy_id: string
+  member_name: string
+}> = {
+  'member@laya-demo.com': {
+    member_id: 'M-1001',
+    policy_id: 'P-2001',
+    member_name: 'Aisha Khan',
+  },
+}
+
 function generateClaimId() {
   const year = new Date().getFullYear()
   const rand = Math.floor(Math.random() * 100000).toString().padStart(5, '0')
@@ -568,36 +580,42 @@ if (!claim) throw new Error('No claim returned')
 
 // ── Send to FastAPI decision engine ──
 try {
+  const fallback = user.email ? demoFallbackByEmail[user.email] : undefined
+
   const payload = {
-  member_id: profile?.member_id ?? user.id,
-  policy_id: profile?.policy_id ?? null,
-  member_name: profile?.full_name ?? user.email ?? 'Unknown member',
-  contact_email: user.email || '',
-  contact_phone: user.user_metadata?.phone || null,
-  claim_type: form.claimType,
-  service_type: form.serviceType,
-  treatment_country: form.treatmentCountry === 'Abroad' ? 'Abroad' : 'Ireland',
-  short_description: form.description || null,
-  service_date: form.serviceDate,
-  admission_date: form.admissionDate || null,
-  discharge_date: form.dischargeDate || null,
-  provider_name: form.providerName,
-  provider_type: form.providerType,
-  provider_registration_id: form.providerRegistration || null,
-  amount_claimed_eur: Number(form.totalAmount),
-  currency: form.currency,
-  member_already_paid: form.memberAlreadyPaid,
-  reimbursement_type: form.reimbursementType,
-  account_holder_name: form.accountHolderName || null,
-  iban: form.iban || null,
-  bic_swift: form.bic || null,
-  document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
-  pre_authorized: form.isPreAuthorized,
-  declaration_confirmed: consent,
-  consent_medical_data: consent,
-  terms_accepted: consent,
-  submission_date: new Date().toISOString().split('T')[0],
-}
+    member_id: profile?.member_id ?? fallback?.member_id ?? '',
+    policy_id: profile?.policy_id ?? fallback?.policy_id ?? '',
+    member_name: profile?.full_name ?? fallback?.member_name ?? user.email ?? 'Unknown member',
+    contact_email: user.email || '',
+    contact_phone: user.user_metadata?.phone || null,
+    claim_type: form.claimType,
+    service_type: form.serviceType,
+    treatment_country: form.treatmentCountry === 'Abroad' ? 'Abroad' : 'Ireland',
+    short_description: form.description || null,
+    service_date: form.serviceDate,
+    admission_date: form.admissionDate || null,
+    discharge_date: form.dischargeDate || null,
+    provider_name: form.providerName,
+    provider_type: form.providerType,
+    provider_registration_id: form.providerRegistration || null,
+    amount_claimed_eur: Number(form.totalAmount),
+    currency: form.currency,
+    member_already_paid: form.memberAlreadyPaid,
+    reimbursement_type: form.reimbursementType,
+    account_holder_name: form.accountHolderName || null,
+    iban: form.iban || null,
+    bic_swift: form.bic || null,
+    document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
+    pre_authorized: form.isPreAuthorized,
+    declaration_confirmed: consent,
+    consent_medical_data: consent,
+    terms_accepted: consent,
+    submission_date: new Date().toISOString().split('T')[0],
+  }
+
+  if (!payload.member_id || !payload.policy_id) {
+    throw new Error('Missing member_id/policy_id for decision engine')
+  }
   console.log('Sending to FastAPI:', payload)
 
   const decisionResponse = await fetch(
@@ -609,45 +627,46 @@ try {
     }
   )
 
-  const decisionResult = await decisionResponse.json()
-  setDecisionResult(decisionResult)
-
-  console.log('═══ FASTAPI DECISION ═══')
-  console.log(decisionResult)
+  const decisionJson = await decisionResponse.json()
 
   if (!decisionResponse.ok) {
     throw new Error(
-      decisionResult?.detail
-        ? JSON.stringify(decisionResult.detail)
-        : 'FastAPI claim evaluation failed'
+      Array.isArray(decisionJson?.detail)
+        ? decisionJson.detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join(' | ')
+        : decisionJson?.detail || 'FastAPI claim evaluation failed'
     )
   }
 
-  const uiStatus = mapDecisionToUiStatus(decisionResult.decision)
-  const routing = mapDecisionToRouting(decisionResult.decision)
+  setDecisionResult(decisionJson)
+
+  console.log('═══ FASTAPI DECISION ═══')
+  console.log(decisionJson)
+
+  const uiStatus = mapDecisionToUiStatus(decisionJson.decision)
+  const routing = mapDecisionToRouting(decisionJson.decision)
 
   await supabase
     .from('claims')
     .update({
       status: uiStatus,                         // UI-friendly
-      engine_status: decisionResult.decision,  // raw model decision
-      ai_decision: decisionResult.decision,
-      ai_decision_reason: decisionResult.decision_explanation,
-      ai_payable_amount: decisionResult.estimated_payable_amount_eur,
-      ai_approved_amount: decisionResult.estimated_payable_amount_eur,
+      engine_status: decisionJson.decision,  // raw model decision
+      ai_decision: decisionJson.decision,
+      ai_decision_reason: decisionJson.decision_explanation,
+      ai_payable_amount: decisionJson.estimated_payable_amount_eur,
+      ai_approved_amount: decisionJson.estimated_payable_amount_eur,
       routing,
-      decision_result: decisionResult,
-      missing_documents: decisionResult.missing_documents ?? [],
-      missing_information: decisionResult.missing_information ?? [],
-      fraud_score: decisionResult.scorecard?.fraud_score ?? null,
-      complexity_score: decisionResult.scorecard?.complexity_score ?? null,
-      anomaly_score: decisionResult.scorecard?.anomaly_score ?? null,
+      decision_result: decisionJson,
+      missing_documents: decisionJson.missing_documents ?? [],
+      missing_information: decisionJson.missing_information ?? [],
+      fraud_score: decisionJson.scorecard?.fraud_score ?? null,
+      complexity_score: decisionJson.scorecard?.complexity_score ?? null,
+      anomaly_score: decisionJson.scorecard?.anomaly_score ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', claim.id)
 
   // ── Save rule trace rows ──
-  const ruleRows = (decisionResult.all_rule_results ?? []).map((r: any) => ({
+  const ruleRows = (decisionJson.all_rule_results ?? []).map((r: any) => ({
     claim_id: claim.id,
     rule_id: r.rule_id,
     rule_name: r.rule_name,
@@ -666,10 +685,10 @@ try {
   await supabase.from('claim_status_history').insert({
     claim_id: claim.id,
     status: uiStatus,
-    engine_status: decisionResult.decision,
+    engine_status: decisionJson.decision,
     actor_id: user.id,
     actor_role: 'member',
-    note: decisionResult.decision_explanation,
+    note: decisionJson.decision_explanation,
   })
 
 } catch (decisionErr) {
@@ -735,7 +754,7 @@ try {
 }
   // ── Success screen ──
   if (submitted) {
-  const outlook = decisionResult ? getOutlook(decisionResult.decision) : null
+  const outlook = decisionResult?.decision ? getOutlook(decisionResult.decision) : null
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFA', padding: '40px 24px' }}>
@@ -754,6 +773,12 @@ try {
             </span>
           </p>
         </div>
+
+        {!decisionResult?.decision && (
+          <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FEF2F2', color: '#991B1B' }}>
+            Decision engine did not return a valid result. Please check the API payload.
+          </div>
+        )}
 
         {decisionResult && outlook && (
           <>
