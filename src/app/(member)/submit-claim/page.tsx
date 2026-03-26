@@ -598,6 +598,32 @@ try {
     })
     .eq('id', claim.id)
 
+  // ── Save rule trace rows ──
+  const ruleRows = (decisionResult.all_rule_results ?? []).map((r: any) => ({
+    claim_id: claim.id,
+    rule_id: r.rule_id,
+    rule_name: r.rule_name,
+    source_reference: r.source_reference,
+    notes: r.notes,
+    category: r.category,
+    outcome: r.outcome,
+    message: r.message,
+  }))
+
+  if (ruleRows.length > 0) {
+    await supabase.from('claim_rule_results').insert(ruleRows)
+  }
+
+  // ── Save status history ──
+  await supabase.from('claim_status_history').insert({
+    claim_id: claim.id,
+    status: uiStatus,
+    engine_status: decisionResult.decision,
+    actor_id: user.id,
+    actor_role: 'member',
+    note: decisionResult.decision_explanation,
+  })
+
 } catch (decisionErr) {
   console.warn('FastAPI decision engine failed:', decisionErr)
 }
