@@ -36,6 +36,13 @@ export interface Claim {
   assessor_notes?: string
   created_at: string
   updated_at: string
+  ai_decision?: string | null
+  ai_decision_reason?: string | null
+  routing?: string | null
+  decision_result?: any
+  missing_documents?: string[] | null
+  missing_information?: string[] | null
+  engine_status?: string | null
 }
 
 export interface ClaimDocument {
