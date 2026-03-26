@@ -31,6 +31,34 @@ export default function AdminAnalyticsPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('claims-staff')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'claims' },
+        async () => {
+          const { data } = await supabase.from('claims').select('*').order('created_at', { ascending: false })
+          if (data) {
+            setClaims(data)
+            const approved = data.filter(c => ['Approved', 'Paid'].includes(c.status))
+            const rejected = data.filter(c => c.status === 'Rejected')
+            const pending = data.filter(c => ['Submitted', 'In Review', 'Info Required'].includes(c.status))
+            const totalPaid = approved.reduce((s, c) => s + (c.approved_amount || 0), 0)
+            const avgAmount = data.length ? data.reduce((s, c) => s + (c.total_amount || 0), 0) / data.length : 0
+            const fraudFlagged = data.filter(c => (c.fraud_score || 0) > 0.5).length
+            const autoApproved = data.filter(c => c.routing === 'auto').length
+            setStats({ total: data.length, approved: approved.length, rejected: rejected.length, pending: pending.length, totalPaid, avgAmount, fraudFlagged, autoApproved })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   // Group by type
   const byType = claims.reduce((acc: any, c) => {
     acc[c.claim_type] = (acc[c.claim_type] || 0) + 1

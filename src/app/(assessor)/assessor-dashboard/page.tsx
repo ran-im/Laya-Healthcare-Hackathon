@@ -112,6 +112,21 @@ export default function AssessorDashboardPage() {
     setFiltered(r)
   }, [claims, search, routingF, priorityF])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('claims-staff')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'claims' },
+        () => loadData()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   async function loadData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
