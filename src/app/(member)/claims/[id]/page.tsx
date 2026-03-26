@@ -17,16 +17,15 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; icon: string }> 
 export default function ClaimDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { id } = use(params)
+  const supabase = createClient()
   const [claim, setClaim] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      
-      // Create client inside effect to ensure fresh session
-      const supabase = createClient()
       
       // Verify user is logged in
       const { data: { user } } = await supabase.auth.getUser()
@@ -34,6 +33,8 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
         router.push('/login')
         return
       }
+
+      setUserId(user.id)
 
       console.log('Looking up claim ID:', id)
       console.log('Current user ID:', user.id)
@@ -73,6 +74,39 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
     }
     load()
   }, [id])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel(`claims-member-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'claims',
+          filter: `member_id=eq.${userId}`,
+        },
+        () => {
+          // Reload the specific claim
+          async function reload() {
+            const { data: byUUID } = await supabase
+              .from('claims')
+              .select('*')
+              .eq('id', id)
+              .maybeSingle()
+            if (byUUID) setClaim(byUUID)
+          }
+          reload()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId, id])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>

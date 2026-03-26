@@ -68,6 +68,7 @@ export default function ClaimsPage() {
   const [claims, setClaims]     = useState<Claim[]>([])
   const [filtered, setFiltered] = useState<Claim[]>([])
   const [loading, setLoading]   = useState(true)
+  const [userId, setUserId]     = useState<string | null>(null)
 
   // Filters
   const [search, setSearch]         = useState('')
@@ -94,10 +95,43 @@ export default function ClaimsPage() {
     setFiltered(result)
   }, [claims, search, statusFilter, typeFilter, sortBy])
 
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel(`claims-member-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'claims',
+          filter: `member_id=eq.${userId}`,
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadData()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId])
+
   async function loadData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      setUserId(user.id)
       const [profileRes, claimsRes] = await Promise.all([
         supabase.from('profiles').select('full_name,member_id,plan_name').eq('id', user.id).single(),
         supabase.from('claims').select('*').eq('member_id', user.id).order('created_at', { ascending: false }),
