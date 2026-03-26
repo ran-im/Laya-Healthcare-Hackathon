@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { mapDecisionToRouting, mapDecisionToUiStatus } from '@/lib/claim-status'
 import { useDropzone } from 'react-dropzone'
 import {
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -574,25 +575,26 @@ try {
     )
   }
 
+  const uiStatus = mapDecisionToUiStatus(decisionResult.decision)
+  const routing = mapDecisionToRouting(decisionResult.decision)
+
   await supabase
     .from('claims')
     .update({
+      status: uiStatus,                         // UI-friendly
+      engine_status: decisionResult.decision,  // raw model decision
       ai_decision: decisionResult.decision,
       ai_decision_reason: decisionResult.decision_explanation,
       ai_payable_amount: decisionResult.estimated_payable_amount_eur,
       ai_approved_amount: decisionResult.estimated_payable_amount_eur,
-      routing:
-        decisionResult.decision === 'APPROVE'
-          ? 'auto_approved'
-          : decisionResult.decision === 'REJECT'
-          ? 'auto_rejected'
-          : decisionResult.decision === 'NEEDS_INFO'
-          ? 'needs_info'
-          : decisionResult.decision === 'FRAUD_INVESTIGATION'
-          ? 'fraud_investigation'
-          : 'manual_review',
+      routing,
       decision_result: decisionResult,
-      status: decisionResult.decision,
+      missing_documents: decisionResult.missing_documents ?? [],
+      missing_information: decisionResult.missing_information ?? [],
+      fraud_score: decisionResult.scorecard?.fraud_score ?? null,
+      complexity_score: decisionResult.scorecard?.complexity_score ?? null,
+      anomaly_score: decisionResult.scorecard?.anomaly_score ?? null,
+      updated_at: new Date().toISOString(),
     })
     .eq('id', claim.id)
 
