@@ -22,6 +22,8 @@ interface Claim {
   ai_summary: string | null; ai_recommendation: string | null
   assessor_notes: string | null; rejection_reason: string | null
   submitted_at: string; updated_at: string
+  decision_result?: any
+  member_id?: string
   profiles?: { full_name: string; member_id: string; plan_name: string; email: string }
 }
 
@@ -217,6 +219,20 @@ export default function AIReviewPage() {
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
+
+      // Get current user for actor_id
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // Append to claim_status_history
+      const statusMap = { approve: 'Approved', reject: 'Rejected', info: 'Info Required' }
+      await supabase.from('claim_status_history').insert({
+        claim_id: claim.id,
+        status: statusMap[decision],
+        engine_status: null,
+        actor_id: user?.id,
+        actor_role: 'assessor',
+        note: assessorNotes || (decision === 'reject' ? rejectionReason : undefined),
+      })
 
       // Notification
       await supabase.from('notifications').insert({
@@ -493,7 +509,109 @@ export default function AIReviewPage() {
             </div>
           )}
 
-          {/* DECISION PANEL */}
+          {/* ENGINE DECISION PANELS */}
+          {(() => {
+            const engine = claim?.decision_result as any | null
+            return engine ? (
+              <>
+                {/* Model Decision */}
+                {(engine.decision || engine.internal_summary) && (
+                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
+                      🤖 Model Decision
+                    </h3>
+                    {engine.decision && (
+                      <p style={{ fontSize:'13px', fontWeight:700, color:
+                        engine.decision === 'APPROVE' ? '#059669' :
+                        engine.decision === 'REJECT' ? '#DC2626' :
+                        engine.decision === 'NEEDS_INFO' ? '#D97706' : '#6B7280',
+                        margin:'0 0 8px 0' }}>
+                        {engine.decision === 'APPROVE' ? '✓' :
+                         engine.decision === 'REJECT' ? '✗' :
+                         engine.decision === 'NEEDS_INFO' ? '📋' : '→'} {engine.decision}
+                      </p>
+                    )}
+                    {engine.internal_summary && (
+                      <p style={{ fontSize:'13px', color:'#374151', lineHeight:1.6, margin:0 }}>
+                        {engine.internal_summary}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Rule Trace */}
+                {(engine.all_rule_results && engine.all_rule_results.length > 0) && (
+                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 14px 0' }}>
+                      Rule Trace ({engine.all_rule_results.length} rules)
+                    </h3>
+                    <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+                      {(engine.all_rule_results as any[]).map((rule: any) => (
+                        <div key={`${rule.rule_id}-${rule.outcome}`}
+                          style={{ border:'1px solid #E5E7EB', borderRadius:12, padding:12, 
+                                   background: rule.outcome === 'APPROVE' ? '#F0FDFA' : '#FFF7ED' }}>
+                          <div style={{ fontSize:'13px', fontWeight:700, marginBottom:'4px' }}>
+                            {rule.rule_id} — {rule.rule_name}
+                          </div>
+                          <div style={{ fontSize:'12px', color:'#6B7280', marginBottom:'6px' }}>
+                            <span style={{ fontWeight:600, color:
+                              rule.outcome === 'APPROVE' ? '#059669' : '#D97706' }}>
+                              {rule.outcome}
+                            </span> • {rule.category}
+                          </div>
+                          {rule.message && (
+                            <div style={{ fontSize:'12px', color:'#374151', marginBottom:'4px' }}>
+                              {rule.message}
+                            </div>
+                          )}
+                          {rule.source_reference && (
+                            <div style={{ fontSize:'11px', color:'#9CA3AF' }}>
+                              {rule.source_reference}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missing Documents / Information */}
+                {(engine.missing_documents?.length > 0 || engine.missing_information?.length > 0) && (
+                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
+                      Missing Info
+                    </h3>
+                    <pre style={{ background:'#F9FAFB', padding:'12px', borderRadius:'10px',
+                                  overflow:'auto', fontSize:'11px', color:'#374151',
+                                  border:'1px solid #E5E7EB', margin:0, fontFamily:'monospace' }}>
+                      {JSON.stringify({
+                        missing_documents: engine.missing_documents ?? [],
+                        missing_information: engine.missing_information ?? [],
+                      }, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Scorecard */}
+                {engine.scorecard && (
+                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
+                      Scorecard
+                    </h3>
+                    <pre style={{ background:'#F9FAFB', padding:'12px', borderRadius:'10px',
+                                  overflow:'auto', fontSize:'11px', color:'#374151',
+                                  border:'1px solid #E5E7EB', margin:0, fontFamily:'monospace' }}>
+                      {JSON.stringify(engine.scorecard, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </>
+            ) : null
+          })()}
           {!['Approved','Rejected','Paid'].includes(claim.status) && (
             <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                           boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
