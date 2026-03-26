@@ -22,7 +22,8 @@ interface Claim {
   profiles?: { full_name: string; member_id: string }
   ai_decision: string | null
   ai_decision_reason: string | null
-ai_payable_amount: number | null
+  ai_payable_amount: number | null
+  decision_result?: any
 }
 
 interface Stats {
@@ -347,10 +348,10 @@ export default function AssessorDashboardPage() {
 
           {/* Table header */}
           <div style={{ display:'grid',
-                        gridTemplateColumns:'1.8fr 1fr 0.9fr 0.9fr 1fr 1fr 1fr 120px',
+                        gridTemplateColumns:'1.8fr 1fr 0.9fr 0.9fr 1fr 0.9fr 1.2fr 1fr 1fr 120px',
                         padding:'11px 20px', background:'#F9FAFB',
                         borderBottom:'1px solid #F3F4F6', gap:'10px' }}>
-            {['Member / Claim','Type','Amount','Date','Routing','AI Decision','AI Scores','Status','Actions'].map(h => (
+            {['Member / Claim','Type','Amount','Date','Routing','Flags','AI Decision','AI Scores','Status','Actions'].map(h => (
               <div key={h} style={{ fontSize:'11px', fontWeight:600, color:'#9CA3AF',
                                     textTransform:'uppercase', letterSpacing:'0.5px' }}>
                 {h}
@@ -373,15 +374,19 @@ export default function AssessorDashboardPage() {
             filtered.map((claim, i) => {
               const rs  = routingStyle(claim.routing)
               const ps  = priorityStyle(claim.priority || 'normal')
-  const fraudScore     = Math.round((claim.fraud_score     ?? 0) * 100)
-  const complexScore   = Math.round((claim.complexity_score ?? 0) * 100)
+              const fraudScore     = Math.round((claim.fraud_score     ?? 0) * 100)
+              const complexScore   = Math.round((claim.complexity_score ?? 0) * 100)
               const isFraudRisk    = fraudScore >= 60
               const isHighComplex  = complexScore >= 70
+
+              const engine = claim.decision_result as any | null
+              const missingDocs = engine?.missing_documents?.length ?? 0
+              const flaggedRules = (engine?.all_rule_results ?? []).filter((r: any) => r.outcome !== 'APPROVE').length
 
               return (
                 <div key={claim.id}
                   style={{
-                    display:'grid', gridTemplateColumns:'1.6fr 0.9fr 0.8fr 0.8fr 1fr 1.2fr 1fr 0.9fr 110px',
+                    display:'grid', gridTemplateColumns:'1.6fr 0.9fr 0.8fr 0.8fr 1fr 0.8fr 1.2fr 1fr 0.9fr 110px',
                     padding:'14px 20px', gap:'10px', alignItems:'center',
                     borderBottom: i < filtered.length - 1 ? '1px solid #F9FAFB' : 'none',
                     background: isFraudRisk ? '#FFF8F8' : 'white',
@@ -431,6 +436,26 @@ export default function AssessorDashboardPage() {
                       {rs.label}
                     </span>
                   </div>
+
+                  {/* Quality Flags */}
+                  <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+                    {missingDocs > 0 && (
+                      <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 6px',
+                                     borderRadius:'6px', background:'#FFF7ED', color:'#EA580C' }}>
+                        📋 {missingDocs} doc{missingDocs !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {flaggedRules > 0 && (
+                      <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 6px',
+                                     borderRadius:'6px', background:'#FEF2F2', color:'#DC2626' }}>
+                        ⚠️ {flaggedRules} rule{flaggedRules !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {missingDocs === 0 && flaggedRules === 0 && (
+                      <span style={{ fontSize:'10px', color:'#D1D5DB' }}>—</span>
+                    )}
+                  </div>
+
                   {/* AI Decision */}
 <div>
   {claim.ai_decision ? (
