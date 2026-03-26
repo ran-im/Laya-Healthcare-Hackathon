@@ -511,7 +511,28 @@ export default function AIReviewPage() {
 
           {/* ENGINE DECISION PANELS */}
           {(() => {
-            const engine = claim?.decision_result as any | null
+            const engine = (claim?.decision_result ?? {}) as any
+
+            const rejectedRules =
+              engine.rejected_by_rules ??
+              engine.all_rule_results?.filter((r: any) => r.outcome === 'REJECT') ??
+              []
+
+            const needsInfoRules =
+              engine.needs_info_rules ??
+              engine.all_rule_results?.filter((r: any) => r.outcome === 'NEEDS_INFO') ??
+              []
+
+            const reviewRules =
+              engine.review_rules ??
+              engine.all_rule_results?.filter((r: any) => r.outcome === 'HUMAN_REVIEW') ??
+              []
+
+            const fraudRules =
+              engine.fraud_rules ??
+              engine.all_rule_results?.filter((r: any) => r.outcome === 'FRAUD_INVESTIGATION') ??
+              []
+
             return engine ? (
               <>
                 {/* Model Decision */}
