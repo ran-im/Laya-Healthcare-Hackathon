@@ -37,6 +37,12 @@ interface ChatMessage {
   timestamp: Date
 }
 
+interface DecisionEvidenceItem {
+  source?: string
+  id?: string
+  why_relevant?: string
+}
+
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(n)
 }
@@ -95,6 +101,16 @@ export default function AIReviewPage() {
     engine.fraud_rules ??
     engine.all_rule_results?.filter((r: any) => r.outcome === 'FRAUD_INVESTIGATION') ??
     []
+  const evidenceUsed = (engine.evidence_used ?? engine.decision_evidence ?? []) as DecisionEvidenceItem[]
+  const policySources = evidenceUsed.filter((e) =>
+    ['policy', 'policy_chunk', 'benefit_table', 'schedule_of_benefits'].includes(String(e?.source ?? '').toLowerCase())
+  )
+  const hasRuleConflict =
+    typeof engine.conflict_with_rules === 'boolean'
+      ? engine.conflict_with_rules
+      : typeof engine.llm_conflicts_with_rules === 'boolean'
+      ? engine.llm_conflicts_with_rules
+      : engine.decision_source === 'llm' && !!engine.llm_decision && !!engine.decision && engine.llm_decision !== engine.decision
 
   useEffect(() => { loadData() }, [params.id])
   useEffect(() => {
@@ -684,6 +700,115 @@ export default function AIReviewPage() {
                       <p style={{ margin: 0, color: '#374151' }}>
                         <strong>Next action:</strong> {engine.next_action_text}
                       </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Grounded Decision Panels */}
+                {engine && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: '16px',
+                      marginTop: '16px',
+                    }}
+                  >
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      background: '#F8FAFC',
+                      border: '1px solid #E5E7EB',
+                    }}>
+                      <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                        Final Decision
+                      </h3>
+                      <p style={{ margin: '0 0 8px 0', color: '#111827', fontWeight: 700 }}>
+                        {engine.llm_decision || engine.decision || claim.status}
+                      </p>
+                      <p style={{ margin: 0, color: '#4B5563' }}>
+                        Source: {engine.decision_source ?? 'rules'}
+                        {typeof engine.llm_confidence === 'number' ? ` · LLM confidence: ${engine.llm_confidence}` : ''}
+                      </p>
+                    </div>
+
+                    {engine.decision_explanation && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          Rule-engine reason
+                        </h3>
+                        <p style={{ margin: 0, color: '#374151' }}>{engine.decision_explanation}</p>
+                      </div>
+                    )}
+
+                    {engine.assessor_explanation_llm && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#F8FAFC',
+                        border: '1px solid #E5E7EB',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          LLM grounded explanation
+                        </h3>
+                        <p style={{ margin: 0, color: '#374151' }}>{engine.assessor_explanation_llm}</p>
+                      </div>
+                    )}
+
+                    {evidenceUsed.length > 0 && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          Evidence used
+                        </h3>
+                        {evidenceUsed.map((e, i: number) => (
+                          <div key={i} style={{ marginBottom: i < evidenceUsed.length - 1 ? 10 : 0, color: '#374151' }}>
+                            <strong>{e.source ?? 'Unknown source'}</strong> {e.id ? `- ${e.id}` : ''}
+                            {e.why_relevant && <div>{e.why_relevant}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      background: hasRuleConflict ? '#FEF2F2' : '#F0FDF4',
+                      border: `1px solid ${hasRuleConflict ? '#FECACA' : '#BBF7D0'}`,
+                    }}>
+                      <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                        Conflict with rules?
+                      </h3>
+                      <p style={{ margin: 0, color: hasRuleConflict ? '#B91C1C' : '#166534', fontWeight: 600 }}>
+                        {hasRuleConflict ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+
+                    {policySources.length > 0 && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          Retrieved policy sources
+                        </h3>
+                        {policySources.map((e, i: number) => (
+                          <div key={i} style={{ marginBottom: i < policySources.length - 1 ? 10 : 0, color: '#374151' }}>
+                            <strong>{e.source ?? 'Policy source'}</strong> {e.id ? `- ${e.id}` : ''}
+                            {e.why_relevant && <div>{e.why_relevant}</div>}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

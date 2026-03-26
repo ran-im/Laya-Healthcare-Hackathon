@@ -619,7 +619,7 @@ try {
   console.log('Sending to FastAPI:', payload)
 
   const decisionResponse = await fetch(
-    `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/evaluate`,
+    `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/evaluate-hybrid`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -656,6 +656,12 @@ try {
       ai_approved_amount: decisionJson.estimated_payable_amount_eur,
       routing,
       decision_result: decisionJson,
+      llm_decision: decisionJson.llm_decision ?? null,
+      llm_confidence: decisionJson.llm_confidence ?? null,
+      decision_source: decisionJson.decision_source ?? 'rules',
+      decision_evidence: decisionJson.evidence_used ?? [],
+      member_explanation_llm: decisionJson.member_explanation_llm ?? null,
+      assessor_explanation_llm: decisionJson.assessor_explanation_llm ?? null,
       missing_documents: decisionJson.missing_documents ?? [],
       missing_information: decisionJson.missing_information ?? [],
       fraud_score: decisionJson.scorecard?.fraud_score ?? null,
@@ -1420,4 +1426,3 @@ try {
     </div>
   )
 }
-
