@@ -23,6 +23,12 @@ interface Claim {
   service_date: string
   created_at: string
   description: string | null
+  ai_decision?: string
+  ai_decision_reason?: string
+  decision_result?: any
+  fraud_score?: number | null
+  complexity_score?: number | null
+  anomaly_score?: number | null
 }
 
 interface Profile {
@@ -312,6 +318,11 @@ export default function ClaimsPage() {
                     <div style={{ fontSize:'11px', color:'#9CA3AF', fontFamily:'monospace' }}>
                       {claim.claim_id}
                     </div>
+                    {(claim.ai_decision_reason || claim.decision_result?.next_action_text) && (
+                      <div style={{ fontSize:'11px', color:'#6B7280', marginTop:'4px' }}>
+                        {claim.ai_decision_reason || claim.decision_result?.next_action_text || '—'}
+                      </div>
+                    )}
                   </div>
 
                   {/* Type */}
