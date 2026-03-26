@@ -280,6 +280,67 @@ export default function AIReviewPage() {
   const fs = scoreColor(Math.round((claim.fraud_score ?? 0) * 100))
   const cs = scoreColor(Math.round((claim.complexity_score ?? 0) * 100))
 
+  function RuleSection({
+    title,
+    rules,
+  }: {
+    title: string
+    rules: any[]
+  }) {
+    if (!rules?.length) return null
+
+    return (
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid #E5E7EB',
+          borderRadius: '14px',
+          padding: '16px',
+          marginTop: '16px',
+        }}
+      >
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 700 }}>
+          {title} ({rules.length})
+        </h3>
+
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {rules.map((rule: any) => (
+            <div
+              key={`${rule.rule_id}-${rule.message}`}
+              style={{
+                border: '1px solid #E5E7EB',
+                borderRadius: '12px',
+                padding: '12px',
+                background: '#F9FAFB',
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>
+                {rule.rule_id} — {rule.rule_name}
+              </div>
+
+              <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                {rule.outcome} • {rule.category}
+                {rule.source_reference ? ` • ${rule.source_reference}` : ''}
+              </div>
+
+              {rule.message && (
+                <div style={{ marginTop: '8px', fontSize: '14px', color: '#374151' }}>
+                  {rule.message}
+                </div>
+              )}
+
+              {rule.notes && (
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#6B7280' }}>
+                  {rule.notes}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight:'100vh', background:'#F8FAFB', fontFamily:'Inter,system-ui,sans-serif' }}>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}} *{box-sizing:border-box}`}</style>
@@ -561,42 +622,11 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
-                {/* Rule Trace */}
-                {(engine.all_rule_results && engine.all_rule_results.length > 0) && (
-                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
-                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
-                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 14px 0' }}>
-                      Rule Trace ({engine.all_rule_results.length} rules)
-                    </h3>
-                    <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-                      {(engine.all_rule_results as any[]).map((rule: any) => (
-                        <div key={`${rule.rule_id}-${rule.outcome}`}
-                          style={{ border:'1px solid #E5E7EB', borderRadius:12, padding:12, 
-                                   background: rule.outcome === 'APPROVE' ? '#F0FDFA' : '#FFF7ED' }}>
-                          <div style={{ fontSize:'13px', fontWeight:700, marginBottom:'4px' }}>
-                            {rule.rule_id} — {rule.rule_name}
-                          </div>
-                          <div style={{ fontSize:'12px', color:'#6B7280', marginBottom:'6px' }}>
-                            <span style={{ fontWeight:600, color:
-                              rule.outcome === 'APPROVE' ? '#059669' : '#D97706' }}>
-                              {rule.outcome}
-                            </span> • {rule.category}
-                          </div>
-                          {rule.message && (
-                            <div style={{ fontSize:'12px', color:'#374151', marginBottom:'4px' }}>
-                              {rule.message}
-                            </div>
-                          )}
-                          {rule.source_reference && (
-                            <div style={{ fontSize:'11px', color:'#9CA3AF' }}>
-                              {rule.source_reference}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Grouped Rule Sections */}
+                <RuleSection title="❌ Rejected Rules" rules={rejectedRules} />
+                <RuleSection title="📋 Needs Info Rules" rules={needsInfoRules} />
+                <RuleSection title="👤 Human Review Rules" rules={reviewRules} />
+                <RuleSection title="🚨 Fraud Investigation Rules" rules={fraudRules} />
 
                 {/* Missing Documents / Information */}
                 {(engine.missing_documents?.length > 0 || engine.missing_information?.length > 0) && (
