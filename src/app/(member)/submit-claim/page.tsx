@@ -41,35 +41,83 @@ function generateClaimId() {
 // ── Step indicator ─────────────────────────────────────
 function StepIndicator({ current, steps }: { current: number; steps: string[] }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
-      {steps.map((step, i) => {
-        const done    = i < current
-        const active  = i === current
-        return (
-          <div key={step} className="flex items-center">
-            <div className="flex flex-col items-center">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center
-                               text-sm font-bold transition-all duration-300 ${
-                 done   ? 'text-white' :
-                 active ? 'text-white' : 'text-gray-400 bg-gray-100'}`}
-                style={{
-                  background: done ? '#00A89D' : active
-                    ? 'linear-gradient(135deg,#003C3A,#00A89D)' : undefined,
+    <div style={{ marginBottom: '32px' }}>
+      {/* Desktop view - horizontal timeline */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0' }}>
+        {steps.map((step, i) => {
+          const done = i < current
+          const active = i === current
+          return (
+            <div key={step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              {/* Step circle */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                flex: '0 0 auto',
+                position: 'relative',
+                zIndex: 2,
+              }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  transition: 'all 0.3s ease',
+                  background: done ? '#00A89D' : active ? 'linear-gradient(135deg,#003C3A,#00A89D)' : '#E5E7EB',
+                  color: done || active ? 'white' : '#9CA3AF',
+                  boxShadow: active ? '0 4px 12px rgba(0, 168, 157, 0.3)' : 'none',
                 }}>
-                {done ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                  {done ? <CheckCircle2 size={20} style={{ color: 'white' }} /> : i + 1}
+                </div>
+                <span style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  marginTop: '8px',
+                  color: active ? '#003C3A' : done ? '#00A89D' : '#6B7280',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'center',
+                }}>
+                  {step}
+                </span>
               </div>
-              <span className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
-                active ? 'text-gray-900' : done ? 'text-teal-600' : 'text-gray-400'}`}>
-                {step}
-              </span>
+
+              {/* Connector line */}
+              {i < steps.length - 1 && (
+                <div style={{
+                  flex: 1,
+                  height: '2px',
+                  margin: '0 8px',
+                  background: done ? '#00A89D' : '#E5E7EB',
+                  transition: 'background 0.3s ease',
+                  marginBottom: '20px',
+                }} />
+              )}
             </div>
-            {i < steps.length - 1 && (
-              <div className={`w-16 h-0.5 mx-2 mb-5 transition-all duration-300 ${
-                done ? 'bg-teal-400' : 'bg-gray-200'}`} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
+
+      {/* Progress bar */}
+      <div style={{
+        width: '100%',
+        height: '3px',
+        background: '#E5E7EB',
+        borderRadius: '999px',
+        overflow: 'hidden',
+        marginTop: '12px',
+      }}>
+        <div style={{
+          height: '100%',
+          background: 'linear-gradient(90deg, #003C3A, #00A89D)',
+          width: `${((current) / steps.length) * 100}%`,
+          transition: 'width 0.4s ease',
+        }} />
+      </div>
     </div>
   )
 }
