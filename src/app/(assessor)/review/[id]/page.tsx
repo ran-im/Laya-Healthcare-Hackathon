@@ -73,6 +73,29 @@ export default function AIReviewPage() {
   const [assessorNotes, setAssessorNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
 
+  // Rule Explanation
+  const [ruleExplanation, setRuleExplanation] = useState('')
+  const [explainingRules, setExplainingRules] = useState(false)
+
+  // Engine and Rule Arrays
+  const engine = (claim?.decision_result ?? {}) as any
+  const rejectedRules =
+    engine.rejected_by_rules ??
+    engine.all_rule_results?.filter((r: any) => r.outcome === 'REJECT') ??
+    []
+  const needsInfoRules =
+    engine.needs_info_rules ??
+    engine.all_rule_results?.filter((r: any) => r.outcome === 'NEEDS_INFO') ??
+    []
+  const reviewRules =
+    engine.review_rules ??
+    engine.all_rule_results?.filter((r: any) => r.outcome === 'HUMAN_REVIEW') ??
+    []
+  const fraudRules =
+    engine.fraud_rules ??
+    engine.all_rule_results?.filter((r: any) => r.outcome === 'FRAUD_INVESTIGATION') ??
+    []
+
   useEffect(() => { loadData() }, [params.id])
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -252,6 +275,39 @@ export default function AIReviewPage() {
     } finally { setDeciding(false) }
   }
 
+  // ── Explain Rules ──
+  async function explainRules() {
+    if (!engine) return
+
+    const selectedRules =
+      engine.decision === 'REJECT'
+        ? rejectedRules
+        : engine.decision === 'NEEDS_INFO'
+        ? needsInfoRules
+        : engine.decision === 'HUMAN_REVIEW'
+        ? reviewRules
+        : engine.decision === 'FRAUD_INVESTIGATION'
+        ? fraudRules
+        : engine.all_rule_results ?? []
+
+    setExplainingRules(true)
+    try {
+      const res = await fetch('/api/rules/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decision: engine.decision,
+          rules: selectedRules,
+        }),
+      })
+
+      const data = await res.json()
+      setRuleExplanation(data.text || '')
+    } finally {
+      setExplainingRules(false)
+    }
+  }
+
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
                   background:'#F8FAFB', fontFamily:'Inter,system-ui,sans-serif' }}>
@@ -358,7 +414,7 @@ export default function AIReviewPage() {
             </div>
             <div>
               <div style={{ fontWeight:700, fontSize:'14px', color:'#111827', lineHeight:1 }}>laya</div>
-              <div style={{ color:'#9CA3AF', fontSize:'9px', letterSpacing:'2px', textTransform:'uppercase' }}>ai review panel</div>
+              <div style={{ color:'#9CA3AF', fontSize:'9px', letterSpacing:'2px', textTransform:'uppercase' }}>decision engine review</div>
             </div>
           </div>
 
@@ -571,30 +627,7 @@ export default function AIReviewPage() {
           )}
 
           {/* ENGINE DECISION PANELS */}
-          {(() => {
-            const engine = (claim?.decision_result ?? {}) as any
-
-            const rejectedRules =
-              engine.rejected_by_rules ??
-              engine.all_rule_results?.filter((r: any) => r.outcome === 'REJECT') ??
-              []
-
-            const needsInfoRules =
-              engine.needs_info_rules ??
-              engine.all_rule_results?.filter((r: any) => r.outcome === 'NEEDS_INFO') ??
-              []
-
-            const reviewRules =
-              engine.review_rules ??
-              engine.all_rule_results?.filter((r: any) => r.outcome === 'HUMAN_REVIEW') ??
-              []
-
-            const fraudRules =
-              engine.fraud_rules ??
-              engine.all_rule_results?.filter((r: any) => r.outcome === 'FRAUD_INVESTIGATION') ??
-              []
-
-            return engine ? (
+          {engine && (
               <>
                 {/* Model Decision */}
                 {(engine.decision || engine.internal_summary) && (
@@ -655,6 +688,26 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
+                {/* Explain Rules Button */}
+                {engine && (
+                  <div style={{ marginTop: '16px' }}>
+                    <button
+                      onClick={explainRules}
+                      disabled={explainingRules}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #E5E7EB',
+                        background: '#FFFFFF',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {explainingRules ? 'Explaining...' : 'Explain these rules'}
+                    </button>
+                  </div>
+                )}
+
                 {/* Decision-Aware Rule Sections */}
                 {engine?.decision === 'REJECT' && (
                   <RuleSection title="Rejected by Rules" rules={rejectedRules} />
@@ -676,6 +729,22 @@ export default function AIReviewPage() {
                   title="Complete Rule Trace"
                   rules={engine?.all_rule_results ?? []}
                 />
+
+                {/* Rule Explanation */}
+                {ruleExplanation && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {ruleExplanation}
+                  </div>
+                )}
 
                 {/* Missing Documents / Information */}
                 {(engine.missing_documents?.length > 0 || engine.missing_information?.length > 0) && (
@@ -710,8 +779,7 @@ export default function AIReviewPage() {
                   </div>
                 )}
               </>
-            ) : null
-          })()}
+            )}
           {!['Approved','Rejected','Paid'].includes(claim.status) && (
             <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                           boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
