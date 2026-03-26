@@ -622,11 +622,60 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
-                {/* Grouped Rule Sections */}
-                <RuleSection title="❌ Rejected Rules" rules={rejectedRules} />
-                <RuleSection title="📋 Needs Info Rules" rules={needsInfoRules} />
-                <RuleSection title="👤 Human Review Rules" rules={reviewRules} />
-                <RuleSection title="🚨 Fraud Investigation Rules" rules={fraudRules} />
+                {/* Decision Engine Output */}
+                {engine && (
+                  <div
+                    style={{
+                      background: '#F8FAFC',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      marginTop: '16px',
+                    }}
+                  >
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                      Decision Engine Output
+                    </h3>
+
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827', marginBottom: '8px' }}>
+                      Final Decision: {engine.decision || claim.status}
+                    </div>
+
+                    {engine.decision_explanation && (
+                      <p style={{ margin: '0 0 8px 0', color: '#374151' }}>
+                        {engine.decision_explanation}
+                      </p>
+                    )}
+
+                    {engine.next_action_text && (
+                      <p style={{ margin: 0, color: '#374151' }}>
+                        <strong>Next action:</strong> {engine.next_action_text}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Decision-Aware Rule Sections */}
+                {engine?.decision === 'REJECT' && (
+                  <RuleSection title="Rejected by Rules" rules={rejectedRules} />
+                )}
+
+                {engine?.decision === 'NEEDS_INFO' && (
+                  <RuleSection title="Needs More Information" rules={needsInfoRules} />
+                )}
+
+                {engine?.decision === 'HUMAN_REVIEW' && (
+                  <RuleSection title="Manual Review Triggers" rules={reviewRules} />
+                )}
+
+                {engine?.decision === 'FRAUD_INVESTIGATION' && (
+                  <RuleSection title="Fraud Investigation Triggers" rules={fraudRules} />
+                )}
+
+                <RuleSection
+                  title="Complete Rule Trace"
+                  rules={engine?.all_rule_results ?? []}
+                />
 
                 {/* Missing Documents / Information */}
                 {(engine.missing_documents?.length > 0 || engine.missing_information?.length > 0) && (
