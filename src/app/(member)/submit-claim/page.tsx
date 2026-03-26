@@ -456,6 +456,12 @@ export default function SubmitClaimPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, member_id, policy_id')
+        .eq('id', user.id)
+        .single()
+
       const newClaimId = generateClaimId()
       
 
@@ -514,57 +520,35 @@ if (!claim) throw new Error('No claim returned')
 // ── Send to FastAPI decision engine ──
 try {
   const payload = {
-    member_id: 'M-1001',
-    policy_id: 'P-2001',
-    member_name: 'Aisha Khan',
-    contact_email: user.email || '',
-    contact_phone: user.user_metadata?.phone || null,
-
-    claim_type: form.claimType,
-    service_type: form.serviceType,
-    treatment_country: form.treatmentCountry === 'Abroad' ? 'Abroad' : 'Ireland',
-    short_description: form.description || null,
-
-    service_date: form.serviceDate,
-    admission_date: form.admissionDate || null,
-    discharge_date: form.dischargeDate || null,
-
-    provider_name: form.providerName,
-    provider_type: form.providerType,
-    provider_registration_id: form.providerRegistration || null,
-
-    amount_claimed_eur: Number(form.totalAmount),
-    currency: form.currency,
-    member_already_paid: form.memberAlreadyPaid,
-    reimbursement_type: form.reimbursementType,
-    account_holder_name: form.accountHolderName || null,
-    iban: form.iban || null,
-    bic_swift: form.bic || null,
-
-    document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
-    pre_authorized: form.isPreAuthorized,
-
-    declaration_confirmed: consent,
-    consent_medical_data: consent,
-    terms_accepted: consent,
-
-    duplicate_claim: false,
-    is_accident_or_injury: form.isAccidentOrInjury,
-    is_pre_existing: form.isPreExisting,
-    is_experimental: false,
-    is_cosmetic: false,
-    infertility_related: false,
-    first_steps_fertility_benefit: false,
-
-    emergency_overseas: form.claimType === 'Emergency' && form.treatmentCountry === 'Abroad',
-    overseas_preapproved: form.treatmentCountry === 'Abroad' && form.isPreAuthorized,
-    low_confidence_ocr: false,
-    manual_fraud_flag: false,
-    fraud_confirmed: false,
-
-    submission_date: new Date().toISOString().split('T')[0],
-  }
-
+  member_id: profile?.member_id ?? user.id,
+  policy_id: profile?.policy_id ?? null,
+  member_name: profile?.full_name ?? user.email ?? 'Unknown member',
+  contact_email: user.email || '',
+  contact_phone: user.user_metadata?.phone || null,
+  claim_type: form.claimType,
+  service_type: form.serviceType,
+  treatment_country: form.treatmentCountry === 'Abroad' ? 'Abroad' : 'Ireland',
+  short_description: form.description || null,
+  service_date: form.serviceDate,
+  admission_date: form.admissionDate || null,
+  discharge_date: form.dischargeDate || null,
+  provider_name: form.providerName,
+  provider_type: form.providerType,
+  provider_registration_id: form.providerRegistration || null,
+  amount_claimed_eur: Number(form.totalAmount),
+  currency: form.currency,
+  member_already_paid: form.memberAlreadyPaid,
+  reimbursement_type: form.reimbursementType,
+  account_holder_name: form.accountHolderName || null,
+  iban: form.iban || null,
+  bic_swift: form.bic || null,
+  document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
+  pre_authorized: form.isPreAuthorized,
+  declaration_confirmed: consent,
+  consent_medical_data: consent,
+  terms_accepted: consent,
+  submission_date: new Date().toISOString().split('T')[0],
+}
   console.log('Sending to FastAPI:', payload)
 
   const decisionResponse = await fetch(
