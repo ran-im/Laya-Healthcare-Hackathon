@@ -105,6 +105,10 @@ export default function AIReviewPage() {
   const policySources = evidenceUsed.filter((e) =>
     ['policy', 'policy_chunk', 'benefit_table', 'schedule_of_benefits'].includes(String(e?.source ?? '').toLowerCase())
   )
+  const finalDecision =
+    engine.decision_source === 'llm' && engine.llm_decision
+      ? engine.llm_decision
+      : engine.decision ?? engine.llm_decision ?? claim?.status ?? null
   const hasRuleConflict =
     typeof engine.conflict_with_rules === 'boolean'
       ? engine.conflict_with_rules
@@ -646,21 +650,21 @@ export default function AIReviewPage() {
           {engine && (
               <>
                 {/* Model Decision */}
-                {(engine.decision || engine.internal_summary) && (
+                {(finalDecision || engine.internal_summary) && (
                   <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                                 boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
                     <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
                       🤖 Model Decision
                     </h3>
-                    {engine.decision && (
+                    {finalDecision && (
                       <p style={{ fontSize:'13px', fontWeight:700, color:
-                        engine.decision === 'APPROVE' ? '#059669' :
-                        engine.decision === 'REJECT' ? '#DC2626' :
-                        engine.decision === 'NEEDS_INFO' ? '#D97706' : '#6B7280',
+                        finalDecision === 'APPROVE' ? '#059669' :
+                        finalDecision === 'REJECT' ? '#DC2626' :
+                        finalDecision === 'NEEDS_INFO' ? '#D97706' : '#6B7280',
                         margin:'0 0 8px 0' }}>
-                        {engine.decision === 'APPROVE' ? '✓' :
-                         engine.decision === 'REJECT' ? '✗' :
-                         engine.decision === 'NEEDS_INFO' ? '📋' : '→'} {engine.decision}
+                        {finalDecision === 'APPROVE' ? '✓' :
+                         finalDecision === 'REJECT' ? '✗' :
+                         finalDecision === 'NEEDS_INFO' ? '📋' : '→'} {finalDecision}
                       </p>
                     )}
                     {engine.internal_summary && (
@@ -687,7 +691,7 @@ export default function AIReviewPage() {
                     </h3>
 
                     <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827', marginBottom: '8px' }}>
-                      Final Decision: {engine.decision || claim.status}
+                      Final Decision: {finalDecision || claim.status}
                     </div>
 
                     {engine.decision_explanation && (
@@ -723,7 +727,7 @@ export default function AIReviewPage() {
                         Final Decision
                       </h3>
                       <p style={{ margin: '0 0 8px 0', color: '#111827', fontWeight: 700 }}>
-                        {engine.llm_decision || engine.decision || claim.status}
+                        {finalDecision || claim.status}
                       </p>
                       <p style={{ margin: 0, color: '#4B5563' }}>
                         Source: {engine.decision_source ?? 'rules'}
