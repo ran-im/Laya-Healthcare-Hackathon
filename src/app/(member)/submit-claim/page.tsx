@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { mapDecisionToRouting, mapDecisionToUiStatus } from '@/lib/claim-status'
+import type { HybridDecisionResult, TriggeredRuleSummary } from '@/types'
 import { useDropzone } from 'react-dropzone'
 import {
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -472,7 +473,7 @@ export default function SubmitClaimPage() {
   const [submitted, setSubmitted] = useState(false)
   const [claimId, setClaimId] = useState('')
   const [consent, setConsent] = useState(false)
-  const [decisionResult, setDecisionResult] = useState<any>(null)
+  const [decisionResult, setDecisionResult] = useState<HybridDecisionResult | null>(null)
   
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -619,7 +620,7 @@ try {
   console.log('Sending to FastAPI:', payload)
 
   const decisionResponse = await fetch(
-    `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/evaluate-hybrid`,
+    `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/submit-hybrid-simple`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -632,55 +633,62 @@ try {
   if (!decisionResponse.ok) {
     throw new Error(
       Array.isArray(decisionJson?.detail)
-        ? decisionJson.detail.map((d: any) => `${d.loc?.join('.')}: ${d.msg}`).join(' | ')
+        ? decisionJson.detail.map((d: { loc?: string[]; msg?: string }) => `${d.loc?.join('.')}: ${d.msg}`).join(' | ')
         : decisionJson?.detail || 'FastAPI claim evaluation failed'
     )
   }
 
-  setDecisionResult(decisionJson)
+  const hybridDecision = decisionJson as HybridDecisionResult
+  const scorecard = hybridDecision.scorecard as { fraud_score?: number; complexity_score?: number; anomaly_score?: number } | undefined
+  setDecisionResult(hybridDecision)
 
   console.log('═══ FASTAPI DECISION ═══')
-  console.log(decisionJson)
+  console.log(hybridDecision)
 
-  const uiStatus = mapDecisionToUiStatus(decisionJson.decision)
-  const routing = mapDecisionToRouting(decisionJson.decision)
+  const finalDecision = hybridDecision.final_decision ?? hybridDecision.decision
+  const uiStatus = mapDecisionToUiStatus(finalDecision)
+  const routing = mapDecisionToRouting(finalDecision)
 
   await supabase
     .from('claims')
     .update({
       status: uiStatus,                         // UI-friendly
-      engine_status: decisionJson.decision,  // raw model decision
-      ai_decision: decisionJson.decision,
-      ai_decision_reason: decisionJson.decision_explanation,
-      ai_payable_amount: decisionJson.estimated_payable_amount_eur,
-      ai_approved_amount: decisionJson.estimated_payable_amount_eur,
+      engine_status: finalDecision,
+      ai_decision: finalDecision,
+      ai_decision_reason: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
       routing,
-      decision_result: decisionJson,
-      llm_decision: decisionJson.llm_decision ?? null,
-      llm_confidence: decisionJson.llm_confidence ?? null,
-      decision_source: decisionJson.decision_source ?? 'rules',
-      decision_evidence: decisionJson.evidence_used ?? [],
-      member_explanation_llm: decisionJson.member_explanation_llm ?? null,
-      assessor_explanation_llm: decisionJson.assessor_explanation_llm ?? null,
-      missing_documents: decisionJson.missing_documents ?? [],
-      missing_information: decisionJson.missing_information ?? [],
-      fraud_score: decisionJson.scorecard?.fraud_score ?? null,
-      complexity_score: decisionJson.scorecard?.complexity_score ?? null,
-      anomaly_score: decisionJson.scorecard?.anomaly_score ?? null,
+      decision_result: hybridDecision,
+      claim_reference: hybridDecision.claim_reference ?? newClaimId,
+      decision: hybridDecision.decision ?? null,
+      final_decision: finalDecision,
+      decision_source: hybridDecision.decision_source ?? 'rules',
+      final_display_summary: hybridDecision.final_display_summary ?? null,
+      member_decision_summary: hybridDecision.member_decision_summary ?? null,
+      member_explanation_llm: hybridDecision.member_explanation_llm ?? null,
+      llm_decision: hybridDecision.llm_decision ?? null,
+      llm_confidence: hybridDecision.llm_confidence ?? null,
+      triggered_rules_summary: hybridDecision.triggered_rules_summary ?? [],
+      decision_evidence: hybridDecision.evidence_used ?? [],
+      assessor_explanation_llm: hybridDecision.assessor_explanation_llm ?? null,
+      missing_documents: hybridDecision.missing_documents ?? [],
+      missing_information: hybridDecision.missing_information ?? [],
+      fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
+      complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
+      anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', claim.id)
 
   // ── Save rule trace rows ──
-  const ruleRows = (decisionJson.all_rule_results ?? []).map((r: any) => ({
+  const ruleRows = (hybridDecision.triggered_rules_summary ?? []).map((r: TriggeredRuleSummary) => ({
     claim_id: claim.id,
     rule_id: r.rule_id,
     rule_name: r.rule_name,
-    source_reference: r.source_reference,
-    notes: r.notes,
+    source_reference: null,
+    notes: r.rule_explanation,
     category: r.category,
     outcome: r.outcome,
-    message: r.message,
+    message: r.claim_explanation,
   }))
 
   if (ruleRows.length > 0) {
@@ -691,10 +699,10 @@ try {
   await supabase.from('claim_status_history').insert({
     claim_id: claim.id,
     status: uiStatus,
-    engine_status: decisionJson.decision,
+    engine_status: finalDecision,
     actor_id: user.id,
     actor_role: 'member',
-    note: decisionJson.decision_explanation,
+    note: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
   })
 
 } catch (decisionErr) {
@@ -760,7 +768,10 @@ try {
 }
   // ── Success screen ──
   if (submitted) {
-  const outlook = decisionResult?.decision ? getOutlook(decisionResult.decision) : null
+  const finalDecision = decisionResult?.final_decision ?? decisionResult?.decision
+  const outlook = finalDecision ? getOutlook(finalDecision) : null
+  const topTriggeredRule = decisionResult?.triggered_rules_summary?.[0]
+  const displayReference = decisionResult?.claim_reference || claimId
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFA', padding: '40px 24px' }}>
@@ -775,12 +786,12 @@ try {
           <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
             Reference{' '}
             <span style={{ fontFamily: 'monospace', background: '#F3F4F6', padding: '2px 8px', borderRadius: 6, color: '#374151', fontSize: 12 }}>
-              {claimId}
+              {displayReference}
             </span>
           </p>
         </div>
 
-        {!decisionResult?.decision && (
+        {!finalDecision && (
           <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FEF2F2', color: '#991B1B' }}>
             Decision engine did not return a valid result. Please check the API payload.
           </div>
@@ -794,12 +805,8 @@ try {
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div>
                   <p style={{ fontSize: 18, fontWeight: 600, color: '#111827', margin: '0 0 3px' }}>{outlook.label}</p>
-                  <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>{decisionResult.next_action_text}</p>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
-                  <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 2px' }}>estimated</p>
-                  <p style={{ fontSize: 26, fontWeight: 700, color: outlook.color, margin: 0 }}>
-                    EUR {Number(decisionResult.estimated_payable_amount_eur || 0).toFixed(2)}
+                  <p style={{ fontSize: 13, color: '#374151', margin: 0 }}>
+                    {decisionResult.final_display_summary}
                   </p>
                 </div>
               </div>
@@ -819,54 +826,32 @@ try {
               </div>
             </div>
 
-            {/* ── Action needed ── */}
-            {decisionResult.needs_info_rules?.length > 0 && (
-              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFBEB', border: '1.5px solid #FAC775' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 10px' }}>Action needed to proceed</p>
-                {decisionResult.needs_info_rules.map((rule: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < decisionResult.needs_info_rules.length - 1 ? 8 : 0 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D97706', marginTop: 5, flexShrink: 0 }} />
-                    <p style={{ fontSize: 13, color: '#78350F', margin: 0 }}>{rule.message}</p>
-                  </div>
-                ))}
+            {decisionResult.member_decision_summary && (
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 10px' }}>Member summary</p>
+                <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.6, margin: 0 }}>
+                  {decisionResult.member_decision_summary}
+                </p>
               </div>
             )}
 
-            {/* ── Missing documents ── */}
-            {decisionResult.missing_documents?.length > 0 && (
-              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFBEB', border: '1.5px solid #FAC775' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#92400E', margin: '0 0 10px' }}>Please also upload</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {decisionResult.missing_documents.map((doc: string, i: number) => (
-                    <span key={i} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999, background: 'white', border: '1px solid #FDE68A', color: '#B45309', fontWeight: 500 }}>
-                      {doc}
-                    </span>
-                  ))}
+            {topTriggeredRule && (
+              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FFFFFF', border: '1px solid #E5E7EB' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 10px' }}>Top rule triggered</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
+                    {topTriggeredRule.rule_id} · {topTriggeredRule.rule_name}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280' }}>
+                    {topTriggeredRule.outcome}
+                  </span>
                 </div>
-              </div>
-            )}
-
-            {/* ── Review flags ── */}
-            {decisionResult.review_rules?.length > 0 && (
-              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#F8FAFC', border: '1px solid #E5E7EB' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 10px' }}>One thing to check</p>
-                {decisionResult.review_rules.map((rule: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < decisionResult.review_rules.length - 1 ? 8 : 0 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#9CA3AF', marginTop: 5, flexShrink: 0 }} />
-                    <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>{rule.message}</p>
-                  </div>
-                ))}
-                <p style={{ fontSize: 12, color: '#9CA3AF', margin: '10px 0 0' }}>Our team will look into this — no action needed from you right now.</p>
-              </div>
-            )}
-
-            {/* ── Rejection reason ── */}
-            {decisionResult.rejected_by_rules?.length > 0 && (
-              <div style={{ padding: '16px 20px', borderRadius: 14, background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: '0 0 10px' }}>Why this claim wasn't approved</p>
-                {decisionResult.rejected_by_rules.map((rule: any, i: number) => (
-                  <p key={i} style={{ fontSize: 13, color: '#7F1D1D', margin: i > 0 ? '8px 0 0' : 0 }}>{rule.message}</p>
-                ))}
+                <p style={{ fontSize: 13, color: '#374151', margin: '0 0 6px' }}>
+                  {topTriggeredRule.claim_explanation}
+                </p>
+                <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
+                  {topTriggeredRule.rule_explanation}
+                </p>
               </div>
             )}
 

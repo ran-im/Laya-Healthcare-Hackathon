@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { mapDecisionToRouting, mapDecisionToUiStatus } from '@/lib/claim-status'
+import type { DecisionEvidenceItem, HybridDecisionResult, TriggeredRuleSummary } from '@/types'
 import {
   ChevronLeft, Shield, Brain, CheckCircle2, XCircle,
   AlertCircle, Send, Loader2, FileText, User,
@@ -22,9 +24,14 @@ interface Claim {
   ai_summary: string | null; ai_recommendation: string | null
   assessor_notes: string | null; rejection_reason: string | null
   submitted_at: string; updated_at: string
-  decision_result?: any
+  decision_result?: HybridDecisionResult
   member_id?: string
-  profiles?: { full_name: string; member_id: string; plan_name: string; email: string }
+  member_already_paid?: boolean | null
+  reimbursement_type?: string | null
+  contact_email?: string | null
+  provider_registration?: string | null
+  submission_date?: string | null
+  profiles?: { full_name: string; member_id: string; policy_id?: string; plan_name: string; email: string }
 }
 
 interface Document {
@@ -37,10 +44,12 @@ interface ChatMessage {
   timestamp: Date
 }
 
-interface DecisionEvidenceItem {
-  source?: string
-  id?: string
-  why_relevant?: string
+const demoFallbackByEmail: Record<string, { member_id: string; policy_id: string; member_name: string }> = {
+  'member@laya-demo.com': {
+    member_id: 'M-1001',
+    policy_id: 'P-2001',
+    member_name: 'Aisha Khan',
+  },
 }
 
 function fmt(n: number) {
@@ -84,37 +93,33 @@ export default function AIReviewPage() {
   const [explainingRules, setExplainingRules] = useState(false)
 
   // Engine and Rule Arrays
-  const engine = (claim?.decision_result ?? {}) as any
+  const engine = (claim?.decision_result ?? null) as HybridDecisionResult | null
+  const triggeredRules = engine?.triggered_rules_summary ?? []
   const rejectedRules =
-    engine.rejected_by_rules ??
-    engine.all_rule_results?.filter((r: any) => r.outcome === 'REJECT') ??
+    engine?.all_rule_results?.filter((r) => (r as { outcome?: string }).outcome === 'REJECT') ??
     []
   const needsInfoRules =
-    engine.needs_info_rules ??
-    engine.all_rule_results?.filter((r: any) => r.outcome === 'NEEDS_INFO') ??
+    engine?.all_rule_results?.filter((r) => (r as { outcome?: string }).outcome === 'NEEDS_INFO') ??
     []
   const reviewRules =
-    engine.review_rules ??
-    engine.all_rule_results?.filter((r: any) => r.outcome === 'HUMAN_REVIEW') ??
+    engine?.all_rule_results?.filter((r) => (r as { outcome?: string }).outcome === 'HUMAN_REVIEW') ??
     []
   const fraudRules =
-    engine.fraud_rules ??
-    engine.all_rule_results?.filter((r: any) => r.outcome === 'FRAUD_INVESTIGATION') ??
+    engine?.all_rule_results?.filter((r) => (r as { outcome?: string }).outcome === 'FRAUD_INVESTIGATION') ??
     []
-  const evidenceUsed = (engine.evidence_used ?? engine.decision_evidence ?? []) as DecisionEvidenceItem[]
+  const evidenceUsed = engine?.evidence_used ?? []
   const policySources = evidenceUsed.filter((e) =>
     ['policy', 'policy_chunk', 'benefit_table', 'schedule_of_benefits'].includes(String(e?.source ?? '').toLowerCase())
   )
   const finalDecision =
-    engine.decision_source === 'llm' && engine.llm_decision
+    engine?.final_decision ??
+    (engine?.decision_source === 'llm' && engine?.llm_decision
       ? engine.llm_decision
-      : engine.decision ?? engine.llm_decision ?? claim?.status ?? null
+      : engine?.decision ?? engine?.llm_decision ?? claim?.status ?? null)
   const hasRuleConflict =
-    typeof engine.conflict_with_rules === 'boolean'
-      ? engine.conflict_with_rules
-      : typeof engine.llm_conflicts_with_rules === 'boolean'
-      ? engine.llm_conflicts_with_rules
-      : engine.decision_source === 'llm' && !!engine.llm_decision && !!engine.decision && engine.llm_decision !== engine.decision
+    typeof engine?.conflicts_with_rule_engine === 'boolean'
+      ? engine.conflicts_with_rule_engine
+      : engine?.decision_source === 'llm' && !!engine?.llm_decision && !!engine?.decision && engine.llm_decision !== engine.decision
 
   useEffect(() => { loadData() }, [params.id])
   useEffect(() => {
@@ -126,20 +131,28 @@ export default function AIReviewPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-    const [claimRes, docsRes] = await Promise.all([
-      supabase.from('claims').select('*')
-        .eq('id', params.id).single(),
-      supabase.from('claim_documents').select('*').eq('claim_id', params.id),
-    ])
+      const [claimRes, docsRes] = await Promise.all([
+        supabase.from('claims').select('*')
+          .eq('id', params.id).single(),
+        supabase.from('claim_documents').select('*').eq('claim_id', params.id),
+      ])
 
-    if (claimRes.data) {
-      // Fetch profile separately
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, member_id, plan_name, email')
-        .eq('id', claimRes.data.member_id)
-        .single()
-      setClaim({ ...claimRes.data, profiles: profileData })
+      if (claimRes.data) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, member_id, policy_id, plan_name, email')
+          .eq('id', claimRes.data.member_id)
+          .single()
+
+        let hydratedClaim: Claim = { ...claimRes.data, profiles: profileData }
+        if (!hydratedClaim.decision_result) {
+          const evaluatedDecision = await evaluateHybridDecision(hydratedClaim, profileData ?? undefined, docsRes.data ?? [])
+          if (evaluatedDecision) {
+            hydratedClaim = { ...hydratedClaim, decision_result: evaluatedDecision }
+          }
+        }
+
+        setClaim(hydratedClaim)
         setApprovedAmt(claimRes.data.total_amount?.toString() || '')
         // If AI summary already exists, add to chat
         if (claimRes.data.ai_summary) {
@@ -152,6 +165,99 @@ export default function AIReviewPage() {
       }
       if (docsRes.data) setDocs(docsRes.data)
     } finally { setLoading(false) }
+  }
+
+  async function evaluateHybridDecision(
+    claimRecord: Claim,
+    profileData: Claim['profiles'],
+    documents: Document[]
+  ): Promise<HybridDecisionResult | null> {
+    const fallback = claimRecord.contact_email ? demoFallbackByEmail[claimRecord.contact_email] : undefined
+    const memberId = profileData?.member_id ?? fallback?.member_id ?? ''
+    const policyId = profileData?.policy_id ?? fallback?.policy_id ?? ''
+
+    if (!memberId || !policyId) {
+      return null
+    }
+
+    const payload = {
+      member_id: memberId,
+      policy_id: policyId,
+      member_name: profileData?.full_name ?? fallback?.member_name ?? 'Unknown member',
+      contact_email: claimRecord.contact_email ?? profileData?.email ?? '',
+      contact_phone: null,
+      claim_type: claimRecord.claim_type,
+      service_type: claimRecord.service_type,
+      treatment_country: claimRecord.treatment_country === 'Abroad' ? 'Abroad' : 'Ireland',
+      short_description: claimRecord.description ?? null,
+      service_date: claimRecord.service_date,
+      admission_date: claimRecord.admission_date ?? null,
+      discharge_date: claimRecord.discharge_date ?? null,
+      provider_name: claimRecord.provider_name,
+      provider_type: claimRecord.provider_type,
+      provider_registration_id: claimRecord.provider_registration ?? null,
+      amount_claimed_eur: Number(claimRecord.total_amount),
+      currency: claimRecord.currency,
+      member_already_paid: claimRecord.member_already_paid ?? true,
+      reimbursement_type: claimRecord.reimbursement_type ?? 'Pay member',
+      account_holder_name: null,
+      iban: null,
+      bic_swift: null,
+      document_types: documents.map((doc) => doc.document_type.toLowerCase().replace(/ /g, '_')),
+      pre_authorized: claimRecord.is_pre_authorized,
+      declaration_confirmed: true,
+      consent_medical_data: true,
+      terms_accepted: true,
+      submission_date: claimRecord.submission_date?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/claims/evaluate-hybrid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const decisionJson = await response.json()
+    if (!response.ok) {
+      console.warn('Hybrid evaluation fallback failed:', decisionJson)
+      return null
+    }
+
+    const evaluatedDecision = decisionJson as HybridDecisionResult
+    const resolvedDecision = evaluatedDecision.final_decision ?? evaluatedDecision.decision
+    const scorecard = evaluatedDecision.scorecard as { fraud_score?: number; complexity_score?: number; anomaly_score?: number } | undefined
+
+    await supabase
+      .from('claims')
+      .update({
+        status: mapDecisionToUiStatus(resolvedDecision),
+        routing: mapDecisionToRouting(resolvedDecision),
+        engine_status: resolvedDecision,
+        ai_decision: resolvedDecision,
+        ai_decision_reason: evaluatedDecision.decision_with_rules_explanation ?? evaluatedDecision.final_display_summary ?? null,
+        decision_result: evaluatedDecision,
+        claim_reference: evaluatedDecision.claim_reference ?? claimRecord.claim_id,
+        decision: evaluatedDecision.decision ?? null,
+        final_decision: resolvedDecision,
+        decision_source: evaluatedDecision.decision_source ?? 'rules',
+        final_display_summary: evaluatedDecision.final_display_summary ?? null,
+        member_decision_summary: evaluatedDecision.member_decision_summary ?? null,
+        member_explanation_llm: evaluatedDecision.member_explanation_llm ?? null,
+        llm_decision: evaluatedDecision.llm_decision ?? null,
+        llm_confidence: evaluatedDecision.llm_confidence ?? null,
+        triggered_rules_summary: evaluatedDecision.triggered_rules_summary ?? [],
+        decision_evidence: evaluatedDecision.evidence_used ?? [],
+        assessor_explanation_llm: evaluatedDecision.assessor_explanation_llm ?? null,
+        missing_documents: evaluatedDecision.missing_documents ?? [],
+        missing_information: evaluatedDecision.missing_information ?? [],
+        fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
+        complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
+        anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', claimRecord.id)
+
+    return evaluatedDecision
   }
 
   // ── View Document ──
@@ -300,14 +406,16 @@ export default function AIReviewPage() {
     if (!engine) return
 
     const selectedRules =
-      engine.decision === 'REJECT'
+      finalDecision === 'REJECT'
         ? rejectedRules
-        : engine.decision === 'NEEDS_INFO'
+        : finalDecision === 'NEEDS_INFO'
         ? needsInfoRules
-        : engine.decision === 'HUMAN_REVIEW'
+        : finalDecision === 'HUMAN_REVIEW'
         ? reviewRules
-        : engine.decision === 'FRAUD_INVESTIGATION'
+        : finalDecision === 'FRAUD_INVESTIGATION'
         ? fraudRules
+        : triggeredRules.length > 0
+        ? triggeredRules
         : engine.all_rule_results ?? []
 
     setExplainingRules(true)
@@ -316,7 +424,7 @@ export default function AIReviewPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          decision: engine.decision,
+          decision: finalDecision,
           rules: selectedRules,
         }),
       })
@@ -690,13 +798,21 @@ export default function AIReviewPage() {
                       Decision Engine Output
                     </h3>
 
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827', marginBottom: '8px' }}>
-                      Final Decision: {finalDecision || claim.status}
+                    <div style={{ display: 'grid', gap: '6px', marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>
+                        Decision: {engine.decision || finalDecision || claim.status}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>
+                        Final Decision: {finalDecision || claim.status}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#4B5563' }}>
+                        Source: {engine.decision_source ?? 'rules'}
+                      </div>
                     </div>
 
-                    {engine.decision_explanation && (
+                    {(engine.decision_with_rules_explanation || engine.final_display_summary) && (
                       <p style={{ margin: '0 0 8px 0', color: '#374151' }}>
-                        {engine.decision_explanation}
+                        {engine.decision_with_rules_explanation || engine.final_display_summary}
                       </p>
                     )}
 
@@ -735,7 +851,7 @@ export default function AIReviewPage() {
                       </p>
                     </div>
 
-                    {engine.decision_explanation && (
+                    {(engine.decision_with_rules_explanation || engine.final_display_summary) && (
                       <div style={{
                         padding: '16px',
                         borderRadius: '12px',
@@ -745,7 +861,9 @@ export default function AIReviewPage() {
                         <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
                           Rule-engine reason
                         </h3>
-                        <p style={{ margin: 0, color: '#374151' }}>{engine.decision_explanation}</p>
+                        <p style={{ margin: 0, color: '#374151' }}>
+                          {engine.decision_with_rules_explanation || engine.final_display_summary}
+                        </p>
                       </div>
                     )}
 
@@ -760,6 +878,22 @@ export default function AIReviewPage() {
                           LLM grounded explanation
                         </h3>
                         <p style={{ margin: 0, color: '#374151' }}>{engine.assessor_explanation_llm}</p>
+                      </div>
+                    )}
+
+                    {engine.assessor_rule_trace && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          Assessor rule trace
+                        </h3>
+                        <p style={{ margin: 0, color: '#374151', whiteSpace: 'pre-wrap' }}>
+                          {engine.assessor_rule_trace}
+                        </p>
                       </div>
                     )}
 
@@ -779,6 +913,24 @@ export default function AIReviewPage() {
                             {e.why_relevant && <div>{e.why_relevant}</div>}
                           </div>
                         ))}
+                      </div>
+                    )}
+
+                    {engine.llm_missing_items && engine.llm_missing_items.length > 0 && (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                      }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
+                          LLM missing items
+                        </h3>
+                        <ul style={{ margin: 0, paddingLeft: '20px', color: '#78350F' }}>
+                          {engine.llm_missing_items.map((item, index) => (
+                            <li key={`${item}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 
@@ -817,6 +969,51 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
+                {triggeredRules.length > 0 && (
+                  <div style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '14px',
+                    padding: '16px',
+                    marginTop: '16px',
+                  }}>
+                    <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 700 }}>
+                      Triggered Rules Summary ({triggeredRules.length})
+                    </h3>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {triggeredRules.map((rule: TriggeredRuleSummary) => (
+                        <div
+                          key={`${rule.rule_id}-${rule.outcome}`}
+                          style={{
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '12px',
+                            padding: '12px',
+                            background: '#F9FAFB',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '6px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>
+                              {rule.rule_id} - {rule.rule_name}
+                            </div>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#6B7280' }}>
+                              {rule.outcome}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px' }}>
+                            {rule.category}
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#374151', marginBottom: '6px' }}>
+                            <strong>Rule explanation:</strong> {rule.rule_explanation}
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#374151' }}>
+                            <strong>Claim explanation:</strong> {rule.claim_explanation}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Explain Rules Button */}
                 {engine && (
                   <div style={{ marginTop: '16px' }}>
@@ -838,19 +1035,19 @@ export default function AIReviewPage() {
                 )}
 
                 {/* Decision-Aware Rule Sections */}
-                {engine?.decision === 'REJECT' && (
+                {finalDecision === 'REJECT' && (
                   <RuleSection title="Rejected by Rules" rules={rejectedRules} />
                 )}
 
-                {engine?.decision === 'NEEDS_INFO' && (
+                {finalDecision === 'NEEDS_INFO' && (
                   <RuleSection title="Needs More Information" rules={needsInfoRules} />
                 )}
 
-                {engine?.decision === 'HUMAN_REVIEW' && (
+                {finalDecision === 'HUMAN_REVIEW' && (
                   <RuleSection title="Manual Review Triggers" rules={reviewRules} />
                 )}
 
-                {engine?.decision === 'FRAUD_INVESTIGATION' && (
+                {finalDecision === 'FRAUD_INVESTIGATION' && (
                   <RuleSection title="Fraud Investigation Triggers" rules={fraudRules} />
                 )}
 
@@ -876,7 +1073,7 @@ export default function AIReviewPage() {
                 )}
 
                 {/* Missing Documents / Information */}
-                {(engine.missing_documents?.length > 0 || engine.missing_information?.length > 0) && (
+                {((engine.missing_documents?.length ?? 0) > 0 || (engine.missing_information?.length ?? 0) > 0) && (
                   <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                                 boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
                     <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>

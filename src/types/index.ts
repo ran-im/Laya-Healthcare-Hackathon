@@ -2,6 +2,51 @@ export type UserRole = 'member' | 'assessor' | 'admin' | 'fraud'
 export type ClaimStatus = 'Submitted' | 'In Review' | 'Approved' | 'Paid' | 'Rejected' | 'Info Required'
 export type ClaimType = 'Outpatient' | 'Inpatient' | 'Emergency' | 'Pharmacy' | 'Dental' | 'Optical'
 
+export interface TriggeredRuleSummary {
+  rule_id: string
+  rule_name: string
+  outcome: string
+  category: string
+  rule_explanation: string
+  claim_explanation: string
+}
+
+export interface DecisionEvidenceItem {
+  source?: string
+  id?: string
+  why_relevant?: string
+}
+
+export interface HybridSimpleResponse {
+  claim_reference: string
+  decision: string
+  final_decision: string
+  decision_source: string
+  final_display_summary: string
+  member_decision_summary: string
+  member_explanation_llm: string
+  llm_decision: string
+  llm_confidence: number
+  triggered_rules_summary: TriggeredRuleSummary[]
+}
+
+export interface HybridDecisionResult extends HybridSimpleResponse {
+  decision_with_rules_explanation?: string
+  decision_explanation?: string
+  assessor_rule_trace?: string
+  evidence_used?: DecisionEvidenceItem[]
+  assessor_explanation_llm?: string
+  llm_missing_items?: string[]
+  conflicts_with_rule_engine?: boolean
+  internal_summary?: string
+  scorecard?: Record<string, unknown> | null
+  payout_breakdown?: Record<string, unknown> | null
+  all_rule_results?: Record<string, unknown>[]
+  missing_documents?: string[]
+  missing_information?: string[]
+  next_action_text?: string | null
+}
+
 export interface User {
   id: string
   email: string
@@ -39,7 +84,7 @@ export interface Claim {
   ai_decision?: string | null
   ai_decision_reason?: string | null
   routing?: string | null
-  decision_result?: any
+  decision_result?: HybridDecisionResult
   missing_documents?: string[] | null
   missing_information?: string[] | null
   engine_status?: string | null
