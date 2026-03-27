@@ -64,6 +64,12 @@ function scoreColor(s: number) {
   return { color: '#059669', bg: '#ECFDF5', label: 'Low Risk' }
 }
 
+function formatScoreLabel(key: string) {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export default function AIReviewPage() {
   const router  = useRouter()
   const params  = useParams()
@@ -1129,14 +1135,56 @@ export default function AIReviewPage() {
                     <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
                       Missing Info
                     </h3>
-                    <pre style={{ background:'#F9FAFB', padding:'12px', borderRadius:'10px',
-                                  overflow:'auto', fontSize:'11px', color:'#374151',
-                                  border:'1px solid #E5E7EB', margin:0, fontFamily:'monospace' }}>
-                      {JSON.stringify({
-                        missing_documents: engine.missing_documents ?? [],
-                        missing_information: engine.missing_information ?? [],
-                      }, null, 2)}
-                    </pre>
+                    {(engine.missing_documents?.length ?? 0) > 0 && (
+                      <div style={{ marginBottom: (engine.missing_information?.length ?? 0) > 0 ? '16px' : 0 }}>
+                        <p style={{ margin:'0 0 10px 0', fontSize:'12px', fontWeight:700, color:'#92400E', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                          Missing documents
+                        </p>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
+                          {(engine.missing_documents ?? []).map((doc, index) => (
+                            <span
+                              key={`${doc}-${index}`}
+                              style={{
+                                fontSize:'12px',
+                                padding:'5px 10px',
+                                borderRadius:'999px',
+                                background:'#FFFBEB',
+                                border:'1px solid #FDE68A',
+                                color:'#B45309',
+                                fontWeight:600,
+                              }}
+                            >
+                              {doc}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(engine.missing_information?.length ?? 0) > 0 && (
+                      <div>
+                        <p style={{ margin:'0 0 10px 0', fontSize:'12px', fontWeight:700, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                          Missing information
+                        </p>
+                        <div style={{ display:'grid', gap:'8px' }}>
+                          {(engine.missing_information ?? []).map((item, index) => (
+                            <div
+                              key={`${item}-${index}`}
+                              style={{
+                                padding:'10px 12px',
+                                borderRadius:'10px',
+                                background:'#F9FAFB',
+                                border:'1px solid #E5E7EB',
+                                color:'#374151',
+                                fontSize:'13px',
+                              }}
+                            >
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1147,11 +1195,39 @@ export default function AIReviewPage() {
                     <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
                       Scorecard
                     </h3>
-                    <pre style={{ background:'#F9FAFB', padding:'12px', borderRadius:'10px',
-                                  overflow:'auto', fontSize:'11px', color:'#374151',
-                                  border:'1px solid #E5E7EB', margin:0, fontFamily:'monospace' }}>
-                      {JSON.stringify(engine.scorecard, null, 2)}
-                    </pre>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'12px' }}>
+                      {Object.entries(engine.scorecard).map(([key, value]) => {
+                        const isNumeric = typeof value === 'number'
+                        const isProbability = isNumeric && key !== 'amount_baseline_eur' && value <= 1
+                        const displayValue =
+                          typeof value === 'number'
+                            ? isProbability
+                              ? `${Math.round(value * 100)}%`
+                              : key === 'amount_baseline_eur'
+                              ? `EUR ${value.toFixed(2)}`
+                              : value.toFixed(2)
+                            : String(value)
+
+                        return (
+                          <div
+                            key={key}
+                            style={{
+                              padding:'14px',
+                              borderRadius:'12px',
+                              background:'#F9FAFB',
+                              border:'1px solid #E5E7EB',
+                            }}
+                          >
+                            <div style={{ fontSize:'11px', fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'6px' }}>
+                              {formatScoreLabel(key)}
+                            </div>
+                            <div style={{ fontSize:'18px', fontWeight:700, color:'#111827' }}>
+                              {displayValue}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </>
