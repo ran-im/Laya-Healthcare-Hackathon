@@ -132,36 +132,53 @@ export default function AIReviewPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
+      const { data: reviewerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (reviewerProfile?.role === 'member') {
+        router.push('/dashboard')
+        return
+      }
+
       let claimData: Claim | null = null
 
-      const { data: byId } = await supabase
+      const { data: candidateClaims } = await supabase
         .from('claims')
         .select('*')
-        .eq('id', routeId)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
+        .limit(200)
 
-      if (byId) {
-        claimData = byId as Claim
-      } else {
+      if (candidateClaims) {
+        claimData =
+          (candidateClaims.find((c) => c.id === routeId) as Claim | undefined) ??
+          (candidateClaims.find((c) => c.claim_id === routeId) as Claim | undefined) ??
+          (candidateClaims.find((c) => (c as { claim_reference?: string | null }).claim_reference === routeId) as Claim | undefined) ??
+          null
+      }
+
+      if (!claimData) {
+        const { data: byId } = await supabase
+          .from('claims')
+          .select('*')
+          .eq('id', routeId)
+          .maybeSingle()
+
         const { data: byClaimId } = await supabase
           .from('claims')
           .select('*')
           .eq('claim_id', routeId)
           .maybeSingle()
 
-        if (byClaimId) {
-          claimData = byClaimId as Claim
-        } else {
-          const { data: byReference } = await supabase
-            .from('claims')
-            .select('*')
-            .eq('claim_reference', routeId)
-            .maybeSingle()
+        const { data: byReference } = await supabase
+          .from('claims')
+          .select('*')
+          .eq('claim_reference', routeId)
+          .maybeSingle()
 
-          if (byReference) {
-            claimData = byReference as Claim
-          }
-        }
+        claimData = (byId as Claim | null) ?? (byClaimId as Claim | null) ?? (byReference as Claim | null) ?? null
       }
 
       if (claimData) {
