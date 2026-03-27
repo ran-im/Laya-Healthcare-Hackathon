@@ -69,6 +69,7 @@ export default function AIReviewPage() {
   const params  = useParams()
   const supabase = createClient()
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const routeId = Array.isArray(params.id) ? params.id[0] : params.id
 
   const [claim, setClaim]   = useState<Claim | null>(null)
   const [docs, setDocs]     = useState<Document[]>([])
@@ -121,7 +122,7 @@ export default function AIReviewPage() {
       ? engine.conflicts_with_rule_engine
       : engine?.decision_source === 'llm' && !!engine?.llm_decision && !!engine?.decision && engine.llm_decision !== engine.decision
 
-  useEffect(() => { loadData() }, [params.id])
+  useEffect(() => { loadData() }, [routeId])
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat])
@@ -131,39 +132,71 @@ export default function AIReviewPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [claimRes, docsRes] = await Promise.all([
-        supabase.from('claims').select('*')
-          .eq('id', params.id).single(),
-        supabase.from('claim_documents').select('*').eq('claim_id', params.id),
-      ])
+      let claimData: Claim | null = null
 
-      if (claimRes.data) {
+      const { data: byId } = await supabase
+        .from('claims')
+        .select('*')
+        .eq('id', routeId)
+        .maybeSingle()
+
+      if (byId) {
+        claimData = byId as Claim
+      } else {
+        const { data: byClaimId } = await supabase
+          .from('claims')
+          .select('*')
+          .eq('claim_id', routeId)
+          .maybeSingle()
+
+        if (byClaimId) {
+          claimData = byClaimId as Claim
+        } else {
+          const { data: byReference } = await supabase
+            .from('claims')
+            .select('*')
+            .eq('claim_reference', routeId)
+            .maybeSingle()
+
+          if (byReference) {
+            claimData = byReference as Claim
+          }
+        }
+      }
+
+      if (claimData) {
+        const { data: docsData } = await supabase
+          .from('claim_documents')
+          .select('*')
+          .eq('claim_id', claimData.id)
+
         const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, member_id, policy_id, plan_name, email')
-          .eq('id', claimRes.data.member_id)
+          .eq('id', claimData.member_id)
           .single()
+        const normalizedProfile = profileData ?? undefined
 
-        let hydratedClaim: Claim = { ...claimRes.data, profiles: profileData }
+        let hydratedClaim: Claim = { ...claimData, profiles: normalizedProfile }
         if (!hydratedClaim.decision_result) {
-          const evaluatedDecision = await evaluateHybridDecision(hydratedClaim, profileData ?? undefined, docsRes.data ?? [])
+          const evaluatedDecision = await evaluateHybridDecision(hydratedClaim, normalizedProfile, docsData ?? [])
           if (evaluatedDecision) {
             hydratedClaim = { ...hydratedClaim, decision_result: evaluatedDecision }
           }
         }
 
         setClaim(hydratedClaim)
-        setApprovedAmt(claimRes.data.total_amount?.toString() || '')
+        setApprovedAmt(claimData.total_amount?.toString() || '')
         // If AI summary already exists, add to chat
-        if (claimRes.data.ai_summary) {
+        if (claimData.ai_summary) {
           setChat([{
             role: 'assistant',
-            content: claimRes.data.ai_summary,
+            content: claimData.ai_summary,
             timestamp: new Date(),
           }])
         }
+        if (docsData) setDocs(docsData)
       }
-      if (docsRes.data) setDocs(docsRes.data)
     } finally { setLoading(false) }
   }
 
