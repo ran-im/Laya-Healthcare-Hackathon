@@ -40,6 +40,7 @@ export interface HybridDecisionResult extends HybridSimpleResponse {
   llm_missing_items?: string[]
   conflicts_with_rule_engine?: boolean
   internal_summary?: string
+  estimated_payable_amount_eur?: number | null
   scorecard?: Record<string, unknown> | null
   payout_breakdown?: Record<string, unknown> | null
   all_rule_results?: Record<string, unknown>[]

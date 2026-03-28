@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { HybridDecisionResult } from '@/types'
 import {
   FileText, Plus, Search, Filter, ChevronRight,
   Clock, CheckCircle2, XCircle, AlertCircle,
@@ -25,7 +26,7 @@ interface Claim {
   description: string | null
   ai_decision?: string
   ai_decision_reason?: string
-  decision_result?: any
+  decision_result?: HybridDecisionResult
   fraud_score?: number | null
   complexity_score?: number | null
   anomaly_score?: number | null
@@ -330,6 +331,12 @@ export default function ClaimsPage() {
           ) : (
             filtered.map((claim, i) => {
               const sc = statusStyle(claim.status)
+              const memberSummary =
+                claim.decision_result?.final_display_summary ??
+                claim.decision_result?.member_decision_summary ??
+                claim.ai_decision_reason ??
+                claim.decision_result?.next_action_text ??
+                null
               return (
                 <div key={claim.id}
                   onClick={() => router.push(`/claims/${claim.id}`)}
@@ -352,9 +359,9 @@ export default function ClaimsPage() {
                     <div style={{ fontSize:'11px', color:'#9CA3AF', fontFamily:'monospace' }}>
                       {claim.claim_id}
                     </div>
-                    {(claim.ai_decision_reason || claim.decision_result?.next_action_text) && (
+                    {memberSummary && (
                       <div style={{ fontSize:'11px', color:'#6B7280', marginTop:'4px' }}>
-                        {claim.ai_decision_reason || claim.decision_result?.next_action_text || '—'}
+                        {memberSummary}
                       </div>
                     )}
                   </div>

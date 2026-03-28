@@ -229,6 +229,38 @@ function AssistantSummaryCard({ text }: { text: string }) {
   )
 }
 
+function buildAssistantSummary(engine: HybridDecisionResult | null, claim: Claim | null) {
+  if (!engine) return null
+
+  const finalDecision = engine.final_decision ?? engine.decision ?? claim?.status ?? 'UNDER REVIEW'
+  const leadRule = engine.triggered_rules_summary?.[0]
+  const supportingRules = (engine.triggered_rules_summary ?? []).slice(1, 4)
+  const source = engine.decision_source ?? 'rules'
+  const confidence =
+    typeof engine.llm_confidence === 'number'
+      ? `${Math.round(engine.llm_confidence * 100)}% confidence`
+      : null
+
+  const lines = [
+    '# Claim Assessment',
+    '## Decision Summary',
+    `**${finalDecision}**`,
+    `Decision source: \`${source}\``,
+    confidence && engine.llm_decision ? `LLM recommendation: **${engine.llm_decision}** (${confidence})` : null,
+    leadRule ? '## Main Rule' : null,
+    leadRule ? `**${leadRule.rule_id} - ${leadRule.rule_name}**` : null,
+    leadRule?.rule_explanation ?? null,
+    leadRule ? '## Claim Impact' : null,
+    leadRule?.claim_explanation ?? null,
+    supportingRules.length > 0 ? '## Supporting Rules' : null,
+    ...supportingRules.map((rule) => `- **${rule.rule_id} - ${rule.rule_name}**: ${rule.claim_explanation}`),
+    engine.final_display_summary ? '## Recommended Display Text' : null,
+    engine.final_display_summary ? `\`${engine.final_display_summary}\`` : null,
+  ].filter(Boolean)
+
+  return lines.join('\n')
+}
+
 export default function AIReviewPage() {
   const router  = useRouter()
   const params  = useParams()
@@ -370,10 +402,14 @@ export default function AIReviewPage() {
         setClaim(hydratedClaim)
         setApprovedAmt(claimData.total_amount?.toString() || '')
         // If AI summary already exists, add to chat
-        if (claimData.decision_result?.ai_assistant_summary) {
+        const assistantSummary =
+          claimData.decision_result?.ai_assistant_summary ??
+          buildAssistantSummary(claimData.decision_result ?? null, claimData)
+
+        if (assistantSummary) {
           setChat([{
             role: 'assistant',
-            content: claimData.decision_result.ai_assistant_summary,
+            content: assistantSummary,
             timestamp: new Date(),
           }])
         } else if (claimData.ai_summary) {
@@ -508,41 +544,22 @@ export default function AIReviewPage() {
     if (!claim) return
     setGenerating(true)
     try {
-      if (claim.decision_result?.ai_assistant_summary) {
+      const assistantSummary =
+        claim.decision_result?.ai_assistant_summary ??
+        buildAssistantSummary(claim.decision_result ?? null, claim)
+
+      if (assistantSummary) {
         setChat([{
           role: 'assistant',
-          content: claim.decision_result.ai_assistant_summary,
+          content: assistantSummary,
           timestamp: new Date(),
         }])
         return
       }
-
-    console.log('Calling /api/ai/summarize...')
-      const response = await fetch('/api/ai/summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId: claim.id }),
-      })
-      console.log('Response status:', response.status)
-      if (!response.ok) {
-        const text = await response.text()
-        console.log('Error body:', text)
-        throw new Error(`HTTP ${response.status}: ${text}`)
-      }
-      const data = await response.json()
-      if (data.summary) {
-        setChat(prev => [...prev, {
-          role: 'assistant',
-          content: data.summary,
-          timestamp: new Date(),
-        }])
-        // Refresh claim to get updated scores
-        loadData()
-      }
     } catch {
       setChat(prev => [...prev, {
         role: 'assistant',
-        content: 'Error generating AI summary. Please check your OpenAI API key is set in environment variables.',
+        content: 'Error generating claim analysis. Please reload the claim and try again.',
         timestamp: new Date(),
       }])
     } finally { setGenerating(false) }

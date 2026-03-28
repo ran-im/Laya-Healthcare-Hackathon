@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { HybridDecisionResult } from '@/types'
 
 const C = { dark: '#003C3A', mid: '#005C58', teal: '#00A89D', warm: '#F2FAF9', gold: '#E8A020', rose: '#E8505B' }
 
@@ -126,7 +127,19 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
   const status = STATUS_STYLE[claim.status] || STATUS_STYLE['Submitted']
   const fraudPct = Math.round((claim.fraud_score || 0) * 100)
   const complexPct = Math.round((claim.complexity_score || 0) * 100)
-  const engine = claim?.decision_result as any | null
+  const engine = claim?.decision_result as HybridDecisionResult | null
+  const memberSummary =
+    engine?.final_display_summary ??
+    engine?.member_decision_summary ??
+    engine?.decision_explanation ??
+    claim.ai_decision_reason ??
+    null
+  const nextStep =
+    engine?.next_action_text ??
+    (engine?.missing_documents?.length || engine?.missing_information?.length
+      ? 'Please upload the required documents or update the missing information so your claim can continue.'
+      : null)
+  const topTriggeredRule = engine?.triggered_rules_summary?.[0]
 
   return (
     <div style={{ background: '#F8FAFA', minHeight: '100vh' }}>
@@ -155,37 +168,53 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 24px' }}>
         {/* Decision explanation */}
-        {engine?.decision_explanation && (
+        {memberSummary && (
           <div style={{ background: '#F8FAFB', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Decision</h3>
-            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{engine.decision_explanation}</p>
+            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{memberSummary}</p>
           </div>
         )}
 
         {/* Next action */}
-        {engine?.next_action_text && (
+        {nextStep && (
           <div style={{ background: '#F8FAFB', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Next step</h3>
-            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{engine.next_action_text}</p>
+            <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{nextStep}</p>
+          </div>
+        )}
+
+        {/* Main rule */}
+        {topTriggeredRule && (
+          <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #E5E7EB' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Main rule</h3>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              {topTriggeredRule.rule_id} - {topTriggeredRule.rule_name}
+            </div>
+            <div style={{ fontSize: '13px', color: '#374151', marginBottom: '6px' }}>
+              {topTriggeredRule.claim_explanation}
+            </div>
+            <div style={{ fontSize: '12px', color: '#6B7280' }}>
+              {topTriggeredRule.rule_explanation}
+            </div>
           </div>
         )}
 
         {/* Missing documents */}
-        {engine?.missing_documents?.length > 0 && (
+        {(engine?.missing_documents?.length ?? 0) > 0 && (
           <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: 700, color: '#EA580C' }}>Missing documents</h3>
             <ul style={{ margin: 0, paddingLeft: '20px', color: '#7C2D12', fontSize: '14px' }}>
-              {engine.missing_documents.map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
+              {(engine?.missing_documents ?? []).map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
             </ul>
           </div>
         )}
 
         {/* Missing information */}
-        {engine?.missing_information?.length > 0 && (
+        {(engine?.missing_information?.length ?? 0) > 0 && (
           <div style={{ background: '#FFF7ED', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: 700, color: '#EA580C' }}>More information needed</h3>
             <ul style={{ margin: 0, paddingLeft: '20px', color: '#7C2D12', fontSize: '14px' }}>
-              {engine.missing_information.map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
+              {(engine?.missing_information ?? []).map((d: string) => <li key={d} style={{ marginBottom: '4px' }}>{d}</li>)}
             </ul>
           </div>
         )}
@@ -199,7 +228,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
         )}
 
         {/* Rejection notice (legacy fallback) */}
-        {claim.status === 'Rejected' && !engine?.decision_explanation && (
+        {claim.status === 'Rejected' && !memberSummary && (
           <div style={{ background: '#FEF2F2', border: '2px solid #FECACA', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>❌</span>
