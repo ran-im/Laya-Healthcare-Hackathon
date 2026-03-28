@@ -50,6 +50,11 @@ export interface HybridSimpleResponse {
 
 export interface HybridDecisionResult extends HybridSimpleResponse {
   ai_assistant_summary?: string
+  submitted_claim_input?: {
+    account_holder_name?: string | null
+    iban?: string | null
+    bic?: string | null
+  }
   decision_with_rules_explanation?: string
   decision_explanation?: string
   assessor_rule_trace?: string

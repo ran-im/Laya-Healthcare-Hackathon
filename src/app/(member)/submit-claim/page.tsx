@@ -552,9 +552,6 @@ export default function SubmitClaimPage() {
           currency: form.currency,
           member_already_paid: form.memberAlreadyPaid,
           reimbursement_type: form.reimbursementType,
-          account_holder_name: form.accountHolderName || null,
-          iban: form.iban || null,
-          bic: form.bic || null,
           // user answers
           is_accident_or_injury: form.isAccidentOrInjury,
           is_pre_existing: form.isPreExisting,
@@ -641,7 +638,14 @@ try {
     )
   }
 
-  const hybridDecision = decisionJson as HybridDecisionResult
+  const hybridDecision = {
+    ...(decisionJson as HybridDecisionResult),
+    submitted_claim_input: {
+      account_holder_name: form.accountHolderName || null,
+      iban: form.iban || null,
+      bic: form.bic || null,
+    },
+  } as HybridDecisionResult
   const scorecard = hybridDecision.scorecard as { fraud_score?: number; complexity_score?: number; anomaly_score?: number } | undefined
   setDecisionResult(hybridDecision)
 
