@@ -79,7 +79,7 @@ function splitExplanationItems(text: string) {
       if (part.startsWith('Triggered rules:')) {
         const rulesText = part.replace(/^Triggered rules:\s*/, '').trim()
         return rulesText
-          .split(/(?=(?:[A-Z]{2,5}-\d{3}\s*-))/)
+          .split(/(?=(?:[A-Z]{3,5}-\d{3}\s*-))/)
           .map((rule) => rule.trim())
           .filter(Boolean)
       }
@@ -95,7 +95,7 @@ function ExplanationList({ text }: { text: string }) {
     <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '10px', color: '#374151' }}>
       {items.map((item, index) => {
         const labelled = item.match(/^(Claim impact|Final decision|Next action|Evidence sources considered|Lead rule|Rule impact)\s*:\s*(.+)$/i)
-        const ruleMatch = item.match(/^([A-Z]{2,5}-\d{3}\s*-\s*[^:]+):\s*(.+)$/)
+        const ruleMatch = item.match(/^([A-Z]{3,5}-\d{3}\s*-\s*[^:]+):\s*(.+)$/)
 
         if (labelled) {
           return (
@@ -120,6 +120,42 @@ function ExplanationList({ text }: { text: string }) {
         )
       })}
     </ul>
+  )
+}
+
+function formatTraceText(text: string) {
+  return text
+    .replace(/([a-z\)])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z_])([A-Z][a-z])/g, '$1 $2')
+    .replace(/\|/g, '\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+function TraceBlock({ text }: { text: string }) {
+  const lines = formatTraceText(text)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return (
+    <div style={{ display: 'grid', gap: '8px' }}>
+      {lines.map((line, index) => (
+        <div
+          key={`${line}-${index}`}
+          style={{
+            padding: '10px 12px',
+            borderRadius: '10px',
+            background: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            color: '#374151',
+            lineHeight: 1.6,
+          }}
+        >
+          {line}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -998,9 +1034,7 @@ export default function AIReviewPage() {
                         <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
                           Assessor rule trace
                         </h3>
-                        <p style={{ margin: 0, color: '#374151', whiteSpace: 'pre-wrap' }}>
-                          {engine.assessor_rule_trace}
-                        </p>
+                        <TraceBlock text={engine.assessor_rule_trace} />
                       </div>
                     )}
 
