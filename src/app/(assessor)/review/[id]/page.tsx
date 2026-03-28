@@ -229,6 +229,65 @@ function AssistantSummaryCard({ text }: { text: string }) {
   )
 }
 
+function MarkdownMessage({ text }: { text: string }) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+
+  return (
+    <div style={{ display: 'grid', gap: '10px' }}>
+      {lines.map((line, index) => {
+        if (line.startsWith('# ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>
+              {line.replace(/^# /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('## ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '13px', fontWeight: 700, color: '#003C3A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {line.replace(/^## /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('### ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>
+              {line.replace(/^### /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('- ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: '#374151', lineHeight: 1.6 }}>
+              <span style={{ color: '#00A89D', fontWeight: 700 }}>•</span>
+              <span>{renderInlineBold(line.replace(/^- /, ''))}</span>
+            </div>
+          )
+        }
+
+        if (/^\d+\.\s/.test(line)) {
+          const [, number, content] = line.match(/^(\d+)\.\s(.+)$/) ?? []
+          return (
+            <div key={`${line}-${index}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: '#374151', lineHeight: 1.6 }}>
+              <span style={{ color: '#003C3A', fontWeight: 700, minWidth: '18px' }}>{number}.</span>
+              <span>{renderInlineBold(content)}</span>
+            </div>
+          )
+        }
+
+        return (
+          <div key={`${line}-${index}`} style={{ color: '#374151', lineHeight: 1.6 }}>
+            {renderInlineBold(line)}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function buildAssistantSummary(engine: HybridDecisionResult | null, claim: Claim | null) {
   if (!engine) return null
 
@@ -1605,9 +1664,13 @@ export default function AIReviewPage() {
                       borderBottomRightRadius: msg.role === 'user' ? '4px' : '14px',
                       borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : '14px',
                     }}>
-                      {msg.role === 'assistant' && msg.content.includes('# Claim Assessment') ? (
+                      {msg.role === 'assistant' ? (
                         <div style={{ margin:'0 0 6px 0' }}>
-                          <AssistantSummaryCard text={msg.content} />
+                          {msg.content.includes('# Claim Assessment') ? (
+                            <AssistantSummaryCard text={msg.content} />
+                          ) : (
+                            <MarkdownMessage text={msg.content} />
+                          )}
                         </div>
                       ) : (
                         <p style={{ fontSize:'13px', lineHeight:1.6, margin:'0 0 6px 0',
