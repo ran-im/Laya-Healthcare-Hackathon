@@ -70,6 +70,59 @@ function formatScoreLabel(key: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+function splitExplanationItems(text: string) {
+  return text
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .flatMap((part) => {
+      if (part.startsWith('Triggered rules:')) {
+        const rulesText = part.replace(/^Triggered rules:\s*/, '').trim()
+        return rulesText
+          .split(/(?=(?:[A-Z]{2,5}-\d{3}\s*-))/)
+          .map((rule) => rule.trim())
+          .filter(Boolean)
+      }
+
+      return [part]
+    })
+}
+
+function ExplanationList({ text }: { text: string }) {
+  const items = splitExplanationItems(text)
+
+  return (
+    <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '10px', color: '#374151' }}>
+      {items.map((item, index) => {
+        const labelled = item.match(/^(Claim impact|Final decision|Next action|Evidence sources considered|Lead rule|Rule impact)\s*:\s*(.+)$/i)
+        const ruleMatch = item.match(/^([A-Z]{2,5}-\d{3}\s*-\s*[^:]+):\s*(.+)$/)
+
+        if (labelled) {
+          return (
+            <li key={`${item}-${index}`} style={{ lineHeight: 1.6 }}>
+              <strong style={{ color: '#111827' }}>{labelled[1]}:</strong> {labelled[2]}
+            </li>
+          )
+        }
+
+        if (ruleMatch) {
+          return (
+            <li key={`${item}-${index}`} style={{ lineHeight: 1.6 }}>
+              <strong style={{ color: '#111827' }}>{ruleMatch[1]}</strong>: {ruleMatch[2]}
+            </li>
+          )
+        }
+
+        return (
+          <li key={`${item}-${index}`} style={{ lineHeight: 1.6 }}>
+            {item}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export default function AIReviewPage() {
   const router  = useRouter()
   const params  = useParams()
@@ -867,9 +920,9 @@ export default function AIReviewPage() {
                     </div>
 
                     {(engine.decision_with_rules_explanation || engine.final_display_summary) && (
-                      <p style={{ margin: '0 0 8px 0', color: '#374151' }}>
-                        {engine.decision_with_rules_explanation || engine.final_display_summary}
-                      </p>
+                      <div style={{ marginBottom: '8px' }}>
+                        <ExplanationList text={engine.decision_with_rules_explanation || engine.final_display_summary} />
+                      </div>
                     )}
 
                     {engine.next_action_text && (
@@ -917,9 +970,7 @@ export default function AIReviewPage() {
                         <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
                           Rule-engine reason
                         </h3>
-                        <p style={{ margin: 0, color: '#374151' }}>
-                          {engine.decision_with_rules_explanation || engine.final_display_summary}
-                        </p>
+                        <ExplanationList text={engine.decision_with_rules_explanation || engine.final_display_summary} />
                       </div>
                     )}
 
@@ -933,7 +984,7 @@ export default function AIReviewPage() {
                         <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 700 }}>
                           LLM grounded explanation
                         </h3>
-                        <p style={{ margin: 0, color: '#374151' }}>{engine.assessor_explanation_llm}</p>
+                        <ExplanationList text={engine.assessor_explanation_llm} />
                       </div>
                     )}
 
