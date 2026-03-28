@@ -123,8 +123,17 @@ function ExplanationList({ text }: { text: string }) {
   )
 }
 
-function formatTraceText(text: string) {
-  return text
+function formatTraceText(text: unknown) {
+  const normalizedText =
+    typeof text === 'string'
+      ? text
+      : Array.isArray(text)
+      ? text.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join(' | ')
+      : text && typeof text === 'object'
+      ? JSON.stringify(text)
+      : String(text ?? '')
+
+  return normalizedText
     .replace(/([a-z\)])([A-Z])/g, '$1 $2')
     .replace(/([A-Z_])([A-Z][a-z])/g, '$1 $2')
     .replace(/\|/g, '\n')
@@ -132,7 +141,7 @@ function formatTraceText(text: string) {
     .trim()
 }
 
-function TraceBlock({ text }: { text: string }) {
+function TraceBlock({ text }: { text: unknown }) {
   const lines = formatTraceText(text)
     .split('\n')
     .map((line) => line.trim())
