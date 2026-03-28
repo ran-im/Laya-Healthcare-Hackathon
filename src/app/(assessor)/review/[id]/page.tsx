@@ -344,6 +344,7 @@ export default function AIReviewPage() {
   const [approvedAmt, setApprovedAmt]   = useState('')
   const [assessorNotes, setAssessorNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
+  const [requestedDocs, setRequestedDocs] = useState<string[]>([])
 
   // Rule Explanation
   const [ruleExplanation, setRuleExplanation] = useState('')
@@ -377,11 +378,25 @@ export default function AIReviewPage() {
     typeof engine?.conflicts_with_rule_engine === 'boolean'
       ? engine.conflicts_with_rule_engine
       : engine?.decision_source === 'llm' && !!engine?.llm_decision && !!engine?.decision && engine.llm_decision !== engine.decision
+  const currentInfoRequest = engine?.info_request ?? null
+  const suggestedRequestedDocs = Array.from(new Set([
+    ...(engine?.missing_documents ?? []),
+    ...((engine?.llm_missing_items ?? []).filter((item) => !item.includes(':'))),
+  ]))
 
   useEffect(() => { loadData() }, [routeId])
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat])
+  useEffect(() => {
+    if (decision === 'info') {
+      if (currentInfoRequest?.requested_documents?.length) {
+        setRequestedDocs(currentInfoRequest.requested_documents)
+      } else if (requestedDocs.length === 0) {
+        setRequestedDocs(suggestedRequestedDocs)
+      }
+    }
+  }, [decision, currentInfoRequest?.requested_documents, suggestedRequestedDocs.join('|')])
 
   async function loadData() {
     try {
@@ -662,6 +677,8 @@ export default function AIReviewPage() {
     if (!claim || !decision) return
     setDeciding(true)
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+
       const res = await fetch('/api/claims/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -670,13 +687,19 @@ export default function AIReviewPage() {
           decision: decision,
           amount: decision === 'approve' ? approvedAmt : undefined,
           reason: decision === 'reject' ? rejectionReason : undefined,
+          infoRequest: decision === 'info'
+            ? {
+                requested_by: user?.id ?? null,
+                requested_at: new Date().toISOString(),
+                message: assessorNotes || 'Please provide the requested documents so we can continue reviewing your claim.',
+                requested_documents: requestedDocs,
+                allow_additional_upload: true,
+              }
+            : undefined,
         })
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
-
-      // Get current user for actor_id
-      const { data: { user } } = await supabase.auth.getUser()
 
       // Append to claim_status_history
       const statusMap = { approve: 'Approved', reject: 'Rejected', info: 'Info Required' }
@@ -686,7 +709,9 @@ export default function AIReviewPage() {
         engine_status: null,
         actor_id: user?.id,
         actor_role: 'assessor',
-        note: assessorNotes || (decision === 'reject' ? rejectionReason : undefined),
+        note: decision === 'info'
+          ? assessorNotes || `Requested documents: ${requestedDocs.join(', ')}`
+          : assessorNotes || (decision === 'reject' ? rejectionReason : undefined),
       })
 
       // Notification
@@ -699,7 +724,7 @@ export default function AIReviewPage() {
           ? `Your claim ${claim.claim_id} has been approved for ${fmt(Number(approvedAmt))}.`
           : decision === 'reject'
           ? `Your claim ${claim.claim_id} has been rejected. ${rejectionReason}`
-          : `Additional information required for claim ${claim.claim_id}.`,
+          : `Additional information required for claim ${claim.claim_id}. ${assessorNotes || ''}`.trim(),
         action_url: `/claims/${claim.id}`,
       })
 
@@ -1434,6 +1459,29 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
+                {currentInfoRequest && (
+                  <div style={{ marginTop: '16px', background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:'14px', padding:'16px' }}>
+                    <h3 style={{ margin:'0 0 10px 0', fontSize:'16px', fontWeight:700, color:'#9A3412' }}>
+                      Member info request
+                    </h3>
+                    <p style={{ margin:'0 0 8px 0', color:'#7C2D12', fontWeight:600 }}>
+                      Status: {currentInfoRequest.status}
+                    </p>
+                    {currentInfoRequest.message && (
+                      <p style={{ margin:'0 0 10px 0', color:'#7C2D12' }}>{currentInfoRequest.message}</p>
+                    )}
+                    {currentInfoRequest.requested_documents?.length > 0 && (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
+                        {currentInfoRequest.requested_documents.map((doc, index) => (
+                          <span key={`${doc}-${index}`} style={{ fontSize:'12px', padding:'4px 10px', borderRadius:'999px', background:'white', color:'#B45309', border:'1px solid #FDE68A', fontWeight:600 }}>
+                            {doc}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Scorecard */}
                 {engine.scorecard && (
                   <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
@@ -1544,6 +1592,47 @@ export default function AIReviewPage() {
                     </div>
                   )}
 
+                  {decision === 'info' && (
+                    <>
+                      <div>
+                        <label style={{ fontSize:'13px', fontWeight:500, color:'#374151',
+                                        display:'block', marginBottom:'6px' }}>
+                          Request message <span style={{ color:'#D97706' }}>*</span>
+                        </label>
+                        <textarea value={assessorNotes} onChange={e => setAssessorNotes(e.target.value)}
+                          placeholder="Explain what the member needs to provide..."
+                          rows={3}
+                          style={{ width:'100%', padding:'10px 14px', borderRadius:'10px',
+                                   border:'1.5px solid #E5E7EB', fontSize:'13px', resize:'none',
+                                   outline:'none', fontFamily:'inherit' }}
+                          onFocus={e => e.target.style.borderColor = '#D97706'}
+                          onBlur={e  => e.target.style.borderColor = '#E5E7EB'}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize:'13px', fontWeight:500, color:'#374151', display:'block', marginBottom:'8px' }}>
+                          Requested documents
+                        </label>
+                        <div style={{ display:'grid', gap:'8px' }}>
+                          {(suggestedRequestedDocs.length > 0 ? suggestedRequestedDocs : ['pre_authorization_letter', 'invoice', 'receipt', 'discharge_summary']).map((doc) => (
+                            <label key={doc} style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', color:'#374151' }}>
+                              <input
+                                type="checkbox"
+                                checked={requestedDocs.includes(doc)}
+                                onChange={(e) => setRequestedDocs((prev) =>
+                                  e.target.checked ? Array.from(new Set([...prev, doc])) : prev.filter((item) => item !== doc)
+                                )}
+                              />
+                              <span>{doc}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {decision !== 'info' && (
                   <div>
                     <label style={{ fontSize:'13px', fontWeight:500, color:'#374151',
                                     display:'block', marginBottom:'6px' }}>
@@ -1559,9 +1648,10 @@ export default function AIReviewPage() {
                       onBlur={e  => e.target.style.borderColor = '#E5E7EB'}
                     />
                   </div>
+                  )}
 
                   <button onClick={submitDecision}
-                    disabled={deciding || (decision === 'reject' && !rejectionReason)}
+                    disabled={deciding || (decision === 'reject' && !rejectionReason) || (decision === 'info' && !assessorNotes.trim())}
                     style={{
                       padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer',
                       fontWeight:700, fontSize:'14px', color:'white', transition:'all 0.15s',

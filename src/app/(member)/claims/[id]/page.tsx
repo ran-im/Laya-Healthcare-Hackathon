@@ -2,7 +2,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { HybridDecisionResult } from '@/types'
+import type { AdditionalDocument, HybridDecisionResult, InfoRequest } from '@/types'
 
 const C = { dark: '#003C3A', mid: '#005C58', teal: '#00A89D', warm: '#F2FAF9', gold: '#E8A020', rose: '#E8505B' }
 
@@ -23,6 +23,9 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -140,6 +143,95 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
       ? 'Please upload the required documents or update the missing information so your claim can continue.'
       : null)
   const topTriggeredRule = engine?.triggered_rules_summary?.[0]
+  const infoRequest = engine?.info_request as InfoRequest | null | undefined
+  const additionalDocuments = (engine?.additional_documents ?? []) as AdditionalDocument[]
+
+  async function uploadAdditionalDocuments() {
+    if (!claim || !userId || additionalFiles.length === 0 || !infoRequest?.allow_additional_upload) return
+
+    setUploading(true)
+    setUploadMessage('')
+    try {
+      const uploadedDocs: AdditionalDocument[] = []
+
+      for (const file of additionalFiles) {
+        const ext = file.name.split('.').pop()
+        const filePath = `${userId}/${claim.id}/additional-${Date.now()}-${file.name.replace(/\s+/g, '-')}.${ext}`
+
+        const { error: uploadErr } = await supabase.storage
+          .from('claim-documents')
+          .upload(filePath, file)
+
+        if (uploadErr) throw uploadErr
+
+        const { data: urlData } = supabase.storage
+          .from('claim-documents')
+          .getPublicUrl(filePath)
+
+        await supabase.from('claim_documents').insert({
+          claim_id: claim.id,
+          document_type: 'Additional Information',
+          file_name: file.name,
+          file_path: filePath,
+          file_url: urlData?.publicUrl,
+          file_size: file.size,
+          mime_type: file.type,
+        })
+
+        uploadedDocs.push({
+          name: file.name,
+          url: urlData?.publicUrl,
+          uploaded_at: new Date().toISOString(),
+          uploaded_by: userId,
+          document_type: 'Additional Information',
+          file_path: filePath,
+        })
+      }
+
+      const updatedDecisionResult: HybridDecisionResult = {
+        claim_reference: engine?.claim_reference ?? claim.claim_id,
+        decision: engine?.decision ?? claim.status,
+        final_decision: engine?.final_decision ?? engine?.decision ?? claim.status,
+        decision_source: engine?.decision_source ?? 'rules',
+        final_display_summary: engine?.final_display_summary ?? claim.ai_decision_reason ?? '',
+        member_decision_summary: engine?.member_decision_summary ?? engine?.final_display_summary ?? '',
+        member_explanation_llm: engine?.member_explanation_llm ?? '',
+        llm_decision: engine?.llm_decision ?? engine?.final_decision ?? engine?.decision ?? claim.status,
+        llm_confidence: engine?.llm_confidence ?? 0,
+        triggered_rules_summary: engine?.triggered_rules_summary ?? [],
+        ...(engine ?? {}),
+        info_request: {
+          ...(infoRequest ?? {
+            status: 'PENDING',
+            requested_documents: [],
+            allow_additional_upload: true,
+          }),
+          status: 'SUBMITTED',
+        },
+        additional_documents: [...additionalDocuments, ...uploadedDocs],
+      }
+
+      const { error: updateErr } = await supabase
+        .from('claims')
+        .update({
+          status: 'In Review',
+          decision_result: updatedDecisionResult,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', claim.id)
+
+      if (updateErr) throw updateErr
+
+      setClaim((prev: any) => prev ? { ...prev, status: 'In Review', decision_result: updatedDecisionResult } : prev)
+      setAdditionalFiles([])
+      setUploadMessage('Additional documents uploaded successfully. Your claim is back in review.')
+    } catch (uploadErr) {
+      console.error(uploadErr)
+      setUploadMessage('Could not upload additional documents. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div style={{ background: '#F8FAFA', minHeight: '100vh' }}>
@@ -180,6 +272,93 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           <div style={{ background: '#F8FAFB', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: 700, color: C.dark }}>Next step</h3>
             <p style={{ marginBottom: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>{nextStep}</p>
+          </div>
+        )}
+
+        {infoRequest && (
+          <div style={{ background:'#FFF7ED', borderRadius:'12px', padding:'16px', marginBottom:'16px', border:'1px solid #FED7AA' }}>
+            <h3 style={{ marginTop:0, marginBottom:'8px', fontSize:'14px', fontWeight:700, color:'#9A3412' }}>
+              Additional information requested
+            </h3>
+            <p style={{ margin:'0 0 8px 0', fontSize:'13px', color:'#7C2D12', fontWeight:600 }}>
+              Request status: {infoRequest.status}
+            </p>
+            {infoRequest.message && (
+              <p style={{ margin:'0 0 10px 0', fontSize:'14px', color:'#7C2D12', lineHeight:1.6 }}>
+                {infoRequest.message}
+              </p>
+            )}
+            {infoRequest.requested_documents?.length > 0 && (
+              <>
+                <div style={{ fontSize:'12px', color:'#B45309', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>
+                  Requested documents
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'12px' }}>
+                  {infoRequest.requested_documents.map((doc, index) => (
+                    <span key={`${doc}-${index}`} style={{ fontSize:'12px', padding:'5px 10px', borderRadius:'999px', background:'white', border:'1px solid #FDE68A', color:'#B45309', fontWeight:600 }}>
+                      {doc}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {infoRequest.allow_additional_upload && infoRequest.status !== 'RESOLVED' && (
+              <div style={{ marginTop:'12px', paddingTop:'12px', borderTop:'1px solid #FED7AA' }}>
+                <div style={{ fontSize:'12px', color:'#B45309', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>
+                  Upload additional documents
+                </div>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setAdditionalFiles(Array.from(e.target.files ?? []))}
+                  style={{ marginBottom:'12px', fontSize:'13px', color:'#7C2D12' }}
+                />
+                {additionalFiles.length > 0 && (
+                  <ul style={{ margin:'0 0 12px 0', paddingLeft:'20px', color:'#7C2D12', fontSize:'13px' }}>
+                    {additionalFiles.map((file) => (
+                      <li key={`${file.name}-${file.size}`}>{file.name}</li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  onClick={uploadAdditionalDocuments}
+                  disabled={uploading || additionalFiles.length === 0}
+                  style={{
+                    padding:'10px 16px',
+                    borderRadius:'10px',
+                    border:'none',
+                    cursor:'pointer',
+                    fontWeight:700,
+                    color:'white',
+                    background: uploading || additionalFiles.length === 0 ? '#D1D5DB' : `linear-gradient(135deg, ${C.dark}, ${C.teal})`,
+                  }}
+                >
+                  {uploading ? 'Uploading...' : 'Submit additional documents'}
+                </button>
+                {uploadMessage && (
+                  <p style={{ margin:'10px 0 0', fontSize:'13px', color: uploadMessage.includes('successfully') ? '#059669' : '#B91C1C' }}>
+                    {uploadMessage}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {additionalDocuments.length > 0 && (
+              <div style={{ marginTop:'12px' }}>
+                <div style={{ fontSize:'12px', color:'#6B7280', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'8px' }}>
+                  Additional documents submitted
+                </div>
+                <div style={{ display:'grid', gap:'8px' }}>
+                  {additionalDocuments.map((doc, index) => (
+                    <div key={`${doc.name}-${index}`} style={{ padding:'10px 12px', borderRadius:'10px', background:'white', border:'1px solid #E5E7EB', fontSize:'13px', color:'#374151' }}>
+                      {doc.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

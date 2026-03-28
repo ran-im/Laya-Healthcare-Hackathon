@@ -17,6 +17,24 @@ export interface DecisionEvidenceItem {
   why_relevant?: string
 }
 
+export interface InfoRequest {
+  status: 'PENDING' | 'SUBMITTED' | 'RESOLVED'
+  requested_by?: string | null
+  requested_at?: string | null
+  message?: string | null
+  requested_documents: string[]
+  allow_additional_upload: boolean
+}
+
+export interface AdditionalDocument {
+  name: string
+  url?: string | null
+  uploaded_at: string
+  uploaded_by: string
+  document_type?: string | null
+  file_path?: string | null
+}
+
 export interface HybridSimpleResponse {
   claim_reference: string
   decision: string
@@ -41,6 +59,8 @@ export interface HybridDecisionResult extends HybridSimpleResponse {
   conflicts_with_rule_engine?: boolean
   internal_summary?: string
   estimated_payable_amount_eur?: number | null
+  info_request?: InfoRequest | null
+  additional_documents?: AdditionalDocument[]
   scorecard?: Record<string, unknown> | null
   payout_breakdown?: Record<string, unknown> | null
   all_rule_results?: Record<string, unknown>[]
