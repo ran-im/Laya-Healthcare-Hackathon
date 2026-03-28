@@ -31,6 +31,9 @@ interface Claim {
   contact_email?: string | null
   provider_registration?: string | null
   submission_date?: string | null
+  account_holder_name?: string | null
+  iban?: string | null
+  bic?: string | null
   profiles?: { full_name: string; member_id: string; policy_id?: string; plan_name: string; email: string }
 }
 
@@ -531,9 +534,9 @@ export default function AIReviewPage() {
       currency: claimRecord.currency,
       member_already_paid: claimRecord.member_already_paid ?? true,
       reimbursement_type: claimRecord.reimbursement_type ?? 'Pay member',
-      account_holder_name: null,
-      iban: null,
-      bic_swift: null,
+      account_holder_name: claimRecord.account_holder_name ?? null,
+      iban: claimRecord.iban ?? null,
+      bic_swift: claimRecord.bic ?? null,
       document_types: documents.map((doc) => doc.document_type.toLowerCase().replace(/ /g, '_')),
       pre_authorized: claimRecord.is_pre_authorized,
       declaration_confirmed: true,

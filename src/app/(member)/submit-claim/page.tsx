@@ -552,6 +552,9 @@ export default function SubmitClaimPage() {
           currency: form.currency,
           member_already_paid: form.memberAlreadyPaid,
           reimbursement_type: form.reimbursementType,
+          account_holder_name: form.accountHolderName || null,
+          iban: form.iban || null,
+          bic: form.bic || null,
           // user answers
           is_accident_or_injury: form.isAccidentOrInjury,
           is_pre_existing: form.isPreExisting,
@@ -648,36 +651,52 @@ try {
   const finalDecision = hybridDecision.final_decision ?? hybridDecision.decision
   const uiStatus = mapDecisionToUiStatus(finalDecision)
   const routing = mapDecisionToRouting(finalDecision)
+  const coreClaimUpdate = {
+    status: uiStatus,
+    engine_status: finalDecision,
+    ai_decision: finalDecision,
+    ai_decision_reason: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
+    routing,
+    decision_result: hybridDecision,
+    missing_documents: hybridDecision.missing_documents ?? [],
+    missing_information: hybridDecision.missing_information ?? [],
+    fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
+    complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
+    anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
+    updated_at: new Date().toISOString(),
+  }
+  const extendedClaimUpdate = {
+    ...coreClaimUpdate,
+    claim_reference: hybridDecision.claim_reference ?? newClaimId,
+    decision: hybridDecision.decision ?? null,
+    final_decision: finalDecision,
+    decision_source: hybridDecision.decision_source ?? 'rules',
+    final_display_summary: hybridDecision.final_display_summary ?? null,
+    member_decision_summary: hybridDecision.member_decision_summary ?? null,
+    member_explanation_llm: hybridDecision.member_explanation_llm ?? null,
+    llm_decision: hybridDecision.llm_decision ?? null,
+    llm_confidence: hybridDecision.llm_confidence ?? null,
+    triggered_rules_summary: hybridDecision.triggered_rules_summary ?? [],
+    decision_evidence: hybridDecision.evidence_used ?? [],
+    assessor_explanation_llm: hybridDecision.assessor_explanation_llm ?? null,
+  }
 
-  await supabase
+  const { error: decisionSaveError } = await supabase
     .from('claims')
-    .update({
-      status: uiStatus,                         // UI-friendly
-      engine_status: finalDecision,
-      ai_decision: finalDecision,
-      ai_decision_reason: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
-      routing,
-      decision_result: hybridDecision,
-      claim_reference: hybridDecision.claim_reference ?? newClaimId,
-      decision: hybridDecision.decision ?? null,
-      final_decision: finalDecision,
-      decision_source: hybridDecision.decision_source ?? 'rules',
-      final_display_summary: hybridDecision.final_display_summary ?? null,
-      member_decision_summary: hybridDecision.member_decision_summary ?? null,
-      member_explanation_llm: hybridDecision.member_explanation_llm ?? null,
-      llm_decision: hybridDecision.llm_decision ?? null,
-      llm_confidence: hybridDecision.llm_confidence ?? null,
-      triggered_rules_summary: hybridDecision.triggered_rules_summary ?? [],
-      decision_evidence: hybridDecision.evidence_used ?? [],
-      assessor_explanation_llm: hybridDecision.assessor_explanation_llm ?? null,
-      missing_documents: hybridDecision.missing_documents ?? [],
-      missing_information: hybridDecision.missing_information ?? [],
-      fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
-      complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
-      anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(extendedClaimUpdate)
     .eq('id', claim.id)
+
+  if (decisionSaveError) {
+    console.warn('Extended claim update failed, retrying with core fields only:', decisionSaveError.message)
+    const { error: fallbackSaveError } = await supabase
+      .from('claims')
+      .update(coreClaimUpdate)
+      .eq('id', claim.id)
+
+    if (fallbackSaveError) {
+      throw fallbackSaveError
+    }
+  }
 
   // ── Save rule trace rows ──
   const ruleRows = (hybridDecision.triggered_rules_summary ?? []).map((r: TriggeredRuleSummary) => ({
