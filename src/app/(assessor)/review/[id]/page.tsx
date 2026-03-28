@@ -168,6 +168,67 @@ function TraceBlock({ text }: { text: unknown }) {
   )
 }
 
+function renderInlineBold(text: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g).filter(Boolean)
+
+  return parts.map((part, index) => {
+    const boldMatch = part.match(/^\*\*(.*?)\*\*$/)
+    if (boldMatch) {
+      return <strong key={`${part}-${index}`} style={{ color: '#111827' }}>{boldMatch[1]}</strong>
+    }
+    return part
+  })
+}
+
+function AssistantSummaryCard({ text }: { text: string }) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+
+  return (
+    <div style={{ display: 'grid', gap: '10px' }}>
+      {lines.map((line, index) => {
+        if (line.startsWith('# ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>
+              {line.replace(/^# /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('## ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '13px', fontWeight: 700, color: '#003C3A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {line.replace(/^## /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('### ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>
+              {line.replace(/^### /, '')}
+            </div>
+          )
+        }
+
+        if (line.startsWith('- ')) {
+          return (
+            <div key={`${line}-${index}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: '#374151', lineHeight: 1.6 }}>
+              <span style={{ color: '#00A89D', fontWeight: 700 }}>•</span>
+              <span>{renderInlineBold(line.replace(/^- /, ''))}</span>
+            </div>
+          )
+        }
+
+        return (
+          <div key={`${line}-${index}`} style={{ color: '#374151', lineHeight: 1.6 }}>
+            {renderInlineBold(line)}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function AIReviewPage() {
   const router  = useRouter()
   const params  = useParams()
@@ -309,7 +370,13 @@ export default function AIReviewPage() {
         setClaim(hydratedClaim)
         setApprovedAmt(claimData.total_amount?.toString() || '')
         // If AI summary already exists, add to chat
-        if (claimData.ai_summary) {
+        if (claimData.decision_result?.ai_assistant_summary) {
+          setChat([{
+            role: 'assistant',
+            content: claimData.decision_result.ai_assistant_summary,
+            timestamp: new Date(),
+          }])
+        } else if (claimData.ai_summary) {
           setChat([{
             role: 'assistant',
             content: claimData.ai_summary,
@@ -441,6 +508,15 @@ export default function AIReviewPage() {
     if (!claim) return
     setGenerating(true)
     try {
+      if (claim.decision_result?.ai_assistant_summary) {
+        setChat([{
+          role: 'assistant',
+          content: claim.decision_result.ai_assistant_summary,
+          timestamp: new Date(),
+        }])
+        return
+      }
+
     console.log('Calling /api/ai/summarize...')
       const response = await fetch('/api/ai/summarize', {
         method: 'POST',
@@ -1450,7 +1526,7 @@ export default function AIReviewPage() {
                   Laya AI Assistant
                 </div>
                 <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.5)', marginTop:'2px' }}>
-                  Powered by Claude · Claims Intelligence
+                  Claims Intelligence
                 </div>
               </div>
               <button onClick={generateSummary} disabled={generating}
@@ -1512,10 +1588,16 @@ export default function AIReviewPage() {
                       borderBottomRightRadius: msg.role === 'user' ? '4px' : '14px',
                       borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : '14px',
                     }}>
-                      <p style={{ fontSize:'13px', lineHeight:1.6, margin:'0 0 6px 0',
-                                  whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
-                        {msg.content}
-                      </p>
+                      {msg.role === 'assistant' && msg.content.includes('# Claim Assessment') ? (
+                        <div style={{ margin:'0 0 6px 0' }}>
+                          <AssistantSummaryCard text={msg.content} />
+                        </div>
+                      ) : (
+                        <p style={{ fontSize:'13px', lineHeight:1.6, margin:'0 0 6px 0',
+                                    whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+                          {msg.content}
+                        </p>
+                      )}
                       <p style={{ fontSize:'10px', margin:0,
                                   color: msg.role === 'user' ? 'rgba(255,255,255,0.4)' : '#9CA3AF' }}>
                         {msg.timestamp.toLocaleTimeString('en-IE', { hour:'2-digit', minute:'2-digit' })}

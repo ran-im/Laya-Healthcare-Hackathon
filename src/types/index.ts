@@ -31,6 +31,7 @@ export interface HybridSimpleResponse {
 }
 
 export interface HybridDecisionResult extends HybridSimpleResponse {
+  ai_assistant_summary?: string
   decision_with_rules_explanation?: string
   decision_explanation?: string
   assessor_rule_trace?: string
