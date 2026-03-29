@@ -49,6 +49,26 @@ function getErrorMessage(error: unknown) {
   return 'Unexpected error'
 }
 
+function normalizeAdditionalDocumentType(fileName: string, requestedDocuments: string[] = []) {
+  const fileNameLower = fileName.toLowerCase()
+  const requested = requestedDocuments.map((doc) => doc.toLowerCase())
+
+  const matches = (patterns: string[]) =>
+    patterns.some((pattern) =>
+      fileNameLower.includes(pattern) || requested.some((doc) => doc.includes(pattern))
+    )
+
+  if (matches(['invoice'])) return 'Invoice'
+  if (matches(['receipt'])) return 'Receipt'
+  if (matches(['discharge'])) return 'Discharge Summary'
+  if (matches(['prescription'])) return 'Prescription'
+  if (matches(['referral'])) return 'Referral Letter'
+  if (matches(['lab'])) return 'Lab Report'
+  if (matches(['pre_authorization', 'pre-authorization', 'pre authorization', 'preauth'])) return 'Pre-authorization'
+
+  return 'Other'
+}
+
 export default function ClaimDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { id } = use(params)
@@ -187,10 +207,12 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
     setUploadMessage('')
     try {
       const uploadedDocs: AdditionalDocument[] = []
+      const requestedDocuments = infoRequest?.requested_documents ?? []
 
       for (const file of additionalFiles) {
         const ext = file.name.split('.').pop()
         const filePath = `${userId}/${claim.id}/additional-${Date.now()}-${file.name.replace(/\s+/g, '-')}.${ext}`
+        const documentType = normalizeAdditionalDocumentType(file.name, requestedDocuments)
 
         const { error: uploadErr } = await supabase.storage
           .from('claim-documents')
@@ -204,7 +226,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
 
         const { error: insertErr } = await supabase.from('claim_documents').insert({
           claim_id: claim.id,
-          document_type: 'Additional Information',
+          document_type: documentType,
           file_name: file.name,
           file_path: filePath,
           file_url: urlData?.publicUrl,
@@ -219,7 +241,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           url: urlData?.publicUrl,
           uploaded_at: new Date().toISOString(),
           uploaded_by: userId,
-          document_type: 'Additional Information',
+          document_type: documentType,
           file_path: filePath,
         })
       }
