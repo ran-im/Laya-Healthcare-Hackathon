@@ -473,7 +473,6 @@ export default function SubmitClaimPage() {
   const [claimId, setClaimId] = useState('')
   const [consent, setConsent] = useState(false)
   const [decisionResult, setDecisionResult] = useState<HybridDecisionResult | null>(null)
-  const [submitWarning, setSubmitWarning] = useState<string | null>(null)
   
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -523,7 +522,6 @@ export default function SubmitClaimPage() {
       return
     }
     setSubmitting(true)
-    setSubmitWarning(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -680,16 +678,10 @@ try {
 
   if (!persistenceResponse.ok) {
     console.warn('Hybrid decision persistence failed:', persistenceJson)
-    setSubmitWarning('Claim submitted, but the saved review details are still syncing. Refresh in a moment if the dashboard or assessor view looks outdated.')
   }
 
 } catch (decisionErr) {
   console.warn('FastAPI decision engine failed:', decisionErr)
-  setSubmitWarning(
-    decisionErr instanceof Error
-      ? `Claim submitted, but the decision engine did not return a result yet. ${decisionErr.message}`
-      : 'Claim submitted, but the decision engine did not return a result yet.'
-  )
 }
 
       // 2. Upload documents to Supabase Storage
@@ -777,12 +769,6 @@ try {
         {!finalDecision && (
           <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FFF7ED', color: '#9A3412', border: '1px solid #FED7AA' }}>
             Claim submitted successfully. The decision engine result is not available yet, so this claim may still appear as pending or submitted until the backend finishes syncing.
-          </div>
-        )}
-
-        {submitWarning && (
-          <div style={{ padding: '14px 16px', borderRadius: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: 14, lineHeight: 1.5 }}>
-            {submitWarning}
           </div>
         )}
 
