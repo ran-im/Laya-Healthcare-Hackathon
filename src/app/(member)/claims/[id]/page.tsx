@@ -15,6 +15,40 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; icon: string }> 
   'Info Required': { bg: '#FFF7ED', color: '#EA580C', icon: '⚠️' },
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  if (error && typeof error === 'object') {
+    const candidate = error as {
+      message?: unknown
+      error_description?: unknown
+      details?: unknown
+      hint?: unknown
+      code?: unknown
+      statusText?: unknown
+    }
+
+    const parts = [
+      typeof candidate.message === 'string' ? candidate.message : null,
+      typeof candidate.error_description === 'string' ? candidate.error_description : null,
+      typeof candidate.details === 'string' ? candidate.details : null,
+      typeof candidate.hint === 'string' ? `Hint: ${candidate.hint}` : null,
+      typeof candidate.code === 'string' ? `Code: ${candidate.code}` : null,
+      typeof candidate.statusText === 'string' ? candidate.statusText : null,
+    ].filter(Boolean)
+
+    if (parts.length > 0) return parts.join(' | ')
+
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return 'Unexpected error'
+    }
+  }
+
+  return 'Unexpected error'
+}
+
 export default function ClaimDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { id } = use(params)
@@ -162,7 +196,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           .from('claim-documents')
           .upload(filePath, file)
 
-        if (uploadErr) throw uploadErr
+        if (uploadErr) throw new Error(`Storage upload failed for ${file.name}: ${getErrorMessage(uploadErr)}`)
 
         const { data: urlData } = supabase.storage
           .from('claim-documents')
@@ -178,7 +212,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           mime_type: file.type,
         })
 
-        if (insertErr) throw insertErr
+        if (insertErr) throw new Error(`Document record insert failed for ${file.name}: ${getErrorMessage(insertErr)}`)
 
         uploadedDocs.push({
           name: file.name,
@@ -209,11 +243,10 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
       setAdditionalFiles([])
       setUploadMessage('Additional documents uploaded successfully. Your claim is back in review.')
     } catch (uploadErr) {
-      console.error('Additional document upload failed:', uploadErr)
+      const message = getErrorMessage(uploadErr)
+      console.error('Additional document upload failed:', message, uploadErr)
       setUploadMessage(
-        uploadErr instanceof Error
-          ? uploadErr.message
-          : 'Could not upload additional documents. Please try again.'
+        message || 'Could not upload additional documents. Please try again.'
       )
     } finally {
       setUploading(false)
