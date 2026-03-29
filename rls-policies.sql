@@ -131,6 +131,12 @@ with check (
   )
 );
 
+-- Users can insert notifications only for themselves
+create policy "users can insert own notifications"
+on public.notifications
+for insert
+with check (auth.uid() = user_id);
+
 -- ─────────────────────────────────────────
 -- CLAIM_STATUS_HISTORY TABLE POLICIES
 -- ─────────────────────────────────────────
