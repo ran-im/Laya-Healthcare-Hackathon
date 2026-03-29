@@ -552,7 +552,11 @@ export default function AIReviewPage() {
       reimbursement_type: claimRecord.reimbursement_type ?? 'Pay member',
       account_holder_name: claimRecord.account_holder_name ?? claimRecord.decision_result?.submitted_claim_input?.account_holder_name ?? null,
       iban: claimRecord.iban ?? claimRecord.decision_result?.submitted_claim_input?.iban ?? null,
-      bic_swift: claimRecord.bic ?? claimRecord.decision_result?.submitted_claim_input?.bic ?? null,
+      bic_swift:
+        claimRecord.bic ??
+        claimRecord.decision_result?.submitted_claim_input?.bic_swift ??
+        claimRecord.decision_result?.submitted_claim_input?.bic ??
+        null,
       document_types: documents.map((doc) => doc.document_type.toLowerCase().replace(/ /g, '_')),
       pre_authorized: claimRecord.is_pre_authorized,
       declaration_confirmed: true,

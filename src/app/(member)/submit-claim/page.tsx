@@ -644,6 +644,7 @@ try {
       account_holder_name: form.accountHolderName || null,
       iban: form.iban || null,
       bic: form.bic || null,
+      bic_swift: form.bic || null,
     },
   } as HybridDecisionResult
   const scorecard = hybridDecision.scorecard as { fraud_score?: number; complexity_score?: number; anomaly_score?: number } | undefined

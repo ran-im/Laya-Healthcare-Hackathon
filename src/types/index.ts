@@ -54,6 +54,7 @@ export interface HybridDecisionResult extends HybridSimpleResponse {
     account_holder_name?: string | null
     iban?: string | null
     bic?: string | null
+    bic_swift?: string | null
   }
   decision_with_rules_explanation?: string
   decision_explanation?: string

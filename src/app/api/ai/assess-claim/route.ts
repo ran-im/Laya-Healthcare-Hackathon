@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       reimbursement_type:           claimData.reimbursement_type || 'Pay member',
       account_holder_name:          claimData.account_holder_name || null,
       iban:                         claimData.iban || null,
-      bic_swift:                    claimData.bic || null,
+      bic_swift:                    claimData.bic_swift || claimData.bic || null,
 
       document_types:               claimData.document_types || [],
       pre_authorized:               claimData.is_pre_authorized ?? false,
