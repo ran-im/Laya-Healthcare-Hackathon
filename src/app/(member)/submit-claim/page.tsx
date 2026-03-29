@@ -685,6 +685,11 @@ try {
 
 } catch (decisionErr) {
   console.warn('FastAPI decision engine failed:', decisionErr)
+  setSubmitWarning(
+    decisionErr instanceof Error
+      ? `Claim submitted, but the decision engine did not return a result yet. ${decisionErr.message}`
+      : 'Claim submitted, but the decision engine did not return a result yet.'
+  )
 }
 
       // 2. Upload documents to Supabase Storage
@@ -770,8 +775,8 @@ try {
         </div>
 
         {!finalDecision && (
-          <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FEF2F2', color: '#991B1B' }}>
-            Decision engine did not return a valid result. Please check the API payload.
+          <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FFF7ED', color: '#9A3412', border: '1px solid #FED7AA' }}>
+            Claim submitted successfully. The decision engine result is not available yet, so this claim may still appear as pending or submitted until the backend finishes syncing.
           </div>
         )}
 
