@@ -1,13 +1,33 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { createMockClient } from '@/lib/mock/client'
 
-export async function GET() {
-  // Use service role key for admin operations
-  const supabaseAdmin = createClient(
+const isMock = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
+function getAdminClient() {
+  if (isMock) return createMockClient()
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+}
+
+export async function GET() {
+  if (isMock) {
+    return NextResponse.json({
+      success: true,
+      message: 'Demo users pre-loaded in mock mode',
+      results: [
+        { email: 'member@laya-demo.com', status: 'exists' },
+        { email: 'assessor@laya-demo.com', status: 'exists' },
+        { email: 'admin@laya-demo.com', status: 'exists' },
+        { email: 'fraud@laya-demo.com', status: 'exists' },
+      ],
+    })
+  }
+
+  const supabaseAdmin = getAdminClient()
 
   const demoUsers = [
     {
@@ -44,7 +64,6 @@ export async function GET() {
 
   for (const u of demoUsers) {
     try {
-      // Try to create user
       const { data, error } = await supabaseAdmin.auth.admin.createUser({
         email: u.email,
         password: u.password,
@@ -59,9 +78,8 @@ export async function GET() {
         if (error.message.toLowerCase().includes('already registered') ||
             error.message.toLowerCase().includes('already been registered') ||
             error.message.toLowerCase().includes('duplicate')) {
-          // User exists — find and update their profile
           const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
-          const existing = existingUsers?.users?.find(usr => usr.email === u.email)
+          const existing = (existingUsers as any)?.users?.find((usr: any) => usr.email === u.email)
           if (existing) {
             await supabaseAdmin
               .from('profiles')
@@ -78,7 +96,6 @@ export async function GET() {
           results.push({ email: u.email, status: 'error', message: error.message })
         }
       } else if (data.user) {
-        // New user created — update profile with role
         await supabaseAdmin
           .from('profiles')
           .upsert({

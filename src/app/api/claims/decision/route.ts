@@ -1,22 +1,30 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { createMockClient } from '@/lib/mock/client'
 
-export async function POST(request: Request) {
-  const { claimId, decision, amount, reason } = await request.json()
-  
-  const supabaseAdmin = createClient(
+const isMock = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
+function getAdminClient() {
+  if (isMock) return createMockClient()
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+}
 
-  const updates: any = {
-    status: decision === 'approve' ? 'Approved' 
-          : decision === 'reject' ? 'Rejected' 
+export async function POST(request: Request) {
+  const { claimId, decision, amount, reason } = await request.json()
+
+  const supabaseAdmin = getAdminClient()
+
+  const updates: Record<string, unknown> = {
+    status: decision === 'approve' ? 'Approved'
+          : decision === 'reject' ? 'Rejected'
           : 'Info Required',
     updated_at: new Date().toISOString(),
   }
-  
+
   if (decision === 'approve' && amount) {
     updates.approved_amount = parseFloat(amount)
   }
