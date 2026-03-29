@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { mapDecisionToRouting, mapDecisionToUiStatus } from '@/lib/claim-status'
-import type { HybridDecisionResult, TriggeredRuleSummary } from '@/types'
+import type { HybridDecisionResult } from '@/types'
 import { useDropzone } from 'react-dropzone'
 import {
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -474,6 +473,7 @@ export default function SubmitClaimPage() {
   const [claimId, setClaimId] = useState('')
   const [consent, setConsent] = useState(false)
   const [decisionResult, setDecisionResult] = useState<HybridDecisionResult | null>(null)
+  const [submitWarning, setSubmitWarning] = useState<string | null>(null)
   
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
@@ -490,6 +490,11 @@ export default function SubmitClaimPage() {
       if (!form.providerType)  e.providerType  = 'Provider type is required'
       if (!form.totalAmount || Number(form.totalAmount) <= 0)
         e.totalAmount = 'Enter a valid amount'
+      if (form.reimbursementType === 'Pay member') {
+        if (!form.accountHolderName.trim()) e.accountHolderName = 'Account holder name is required for member reimbursement'
+        if (!form.iban.trim()) e.iban = 'IBAN is required for member reimbursement'
+        if (!form.bic.trim()) e.bic = 'BIC / SWIFT is required for member reimbursement'
+      }
       if (form.claimType === 'Inpatient') {
         if (!form.admissionDate) e.admissionDate = 'Admission date required for inpatient'
         if (!form.dischargeDate) e.dischargeDate = 'Discharge date required for inpatient'
@@ -513,7 +518,12 @@ export default function SubmitClaimPage() {
   // ── Submit ──
   async function handleSubmit() {
     if (!consent) return
+    if (!validateStep(2)) {
+      setStep(2)
+      return
+    }
     setSubmitting(true)
+    setSubmitWarning(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -525,6 +535,9 @@ export default function SubmitClaimPage() {
         .single()
 
       const newClaimId = generateClaimId()
+      const normalizedAccountHolderName = form.reimbursementType === 'Pay member' ? form.accountHolderName.trim() || null : null
+      const normalizedIban = form.reimbursementType === 'Pay member' ? form.iban.trim().toUpperCase() || null : null
+      const normalizedBic = form.reimbursementType === 'Pay member' ? form.bic.trim().toUpperCase() || null : null
       
 
       // 1. Insert claim
@@ -603,9 +616,9 @@ try {
     currency: form.currency,
     member_already_paid: form.memberAlreadyPaid,
     reimbursement_type: form.reimbursementType,
-    account_holder_name: form.accountHolderName || null,
-    iban: form.iban || null,
-    bic_swift: form.bic || null,
+    account_holder_name: normalizedAccountHolderName,
+    iban: normalizedIban,
+    bic_swift: normalizedBic,
     document_types: files.map(f => f.docType.toLowerCase().replace(/ /g, '_')),
     pre_authorized: form.isPreAuthorized,
     declaration_confirmed: consent,
@@ -641,10 +654,10 @@ try {
   const hybridDecision = {
     ...(decisionJson as HybridDecisionResult),
     submitted_claim_input: {
-      account_holder_name: form.accountHolderName || null,
-      iban: form.iban || null,
-      bic: form.bic || null,
-      bic_swift: form.bic || null,
+      account_holder_name: normalizedAccountHolderName,
+      iban: normalizedIban,
+      bic: normalizedBic,
+      bic_swift: normalizedBic,
     },
   } as HybridDecisionResult
   const scorecard = hybridDecision.scorecard as { fraud_score?: number; complexity_score?: number; anomaly_score?: number } | undefined
@@ -653,81 +666,22 @@ try {
   console.log('═══ FASTAPI DECISION ═══')
   console.log(hybridDecision)
 
-  const finalDecision = hybridDecision.final_decision ?? hybridDecision.decision
-  const uiStatus = mapDecisionToUiStatus(finalDecision)
-  const routing = mapDecisionToRouting(finalDecision)
-  const coreClaimUpdate = {
-    status: uiStatus,
-    engine_status: finalDecision,
-    ai_decision: finalDecision,
-    ai_decision_reason: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
-    routing,
-    decision_result: hybridDecision,
-    missing_documents: hybridDecision.missing_documents ?? [],
-    missing_information: hybridDecision.missing_information ?? [],
-    fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
-    complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
-    anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
-    updated_at: new Date().toISOString(),
-  }
-  const extendedClaimUpdate = {
-    ...coreClaimUpdate,
-    claim_reference: hybridDecision.claim_reference ?? newClaimId,
-    decision: hybridDecision.decision ?? null,
-    final_decision: finalDecision,
-    decision_source: hybridDecision.decision_source ?? 'rules',
-    final_display_summary: hybridDecision.final_display_summary ?? null,
-    member_decision_summary: hybridDecision.member_decision_summary ?? null,
-    member_explanation_llm: hybridDecision.member_explanation_llm ?? null,
-    llm_decision: hybridDecision.llm_decision ?? null,
-    llm_confidence: hybridDecision.llm_confidence ?? null,
-    triggered_rules_summary: hybridDecision.triggered_rules_summary ?? [],
-    decision_evidence: hybridDecision.evidence_used ?? [],
-    assessor_explanation_llm: hybridDecision.assessor_explanation_llm ?? null,
-  }
-
-  const { error: decisionSaveError } = await supabase
-    .from('claims')
-    .update(extendedClaimUpdate)
-    .eq('id', claim.id)
-
-  if (decisionSaveError) {
-    console.warn('Extended claim update failed, retrying with core fields only:', decisionSaveError.message)
-    const { error: fallbackSaveError } = await supabase
-      .from('claims')
-      .update(coreClaimUpdate)
-      .eq('id', claim.id)
-
-    if (fallbackSaveError) {
-      throw fallbackSaveError
-    }
-  }
-
-  // ── Save rule trace rows ──
-  const ruleRows = (hybridDecision.triggered_rules_summary ?? []).map((r: TriggeredRuleSummary) => ({
-    claim_id: claim.id,
-    rule_id: r.rule_id,
-    rule_name: r.rule_name,
-    source_reference: null,
-    notes: r.rule_explanation,
-    category: r.category,
-    outcome: r.outcome,
-    message: r.claim_explanation,
-  }))
-
-  if (ruleRows.length > 0) {
-    await supabase.from('claim_rule_results').insert(ruleRows)
-  }
-
-  // ── Save status history ──
-  await supabase.from('claim_status_history').insert({
-    claim_id: claim.id,
-    status: uiStatus,
-    engine_status: finalDecision,
-    actor_id: user.id,
-    actor_role: 'member',
-    note: hybridDecision.final_display_summary ?? hybridDecision.member_decision_summary ?? null,
+  const persistenceResponse = await fetch('/api/claims/hybrid-result', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      claimId: claim.id,
+      newClaimId,
+      hybridDecision,
+    }),
   })
+
+  const persistenceJson = await persistenceResponse.json().catch(() => ({}))
+
+  if (!persistenceResponse.ok) {
+    console.warn('Hybrid decision persistence failed:', persistenceJson)
+    setSubmitWarning('Claim submitted, but the saved review details are still syncing. Refresh in a moment if the dashboard or assessor view looks outdated.')
+  }
 
 } catch (decisionErr) {
   console.warn('FastAPI decision engine failed:', decisionErr)
@@ -818,6 +772,12 @@ try {
         {!finalDecision && (
           <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: '#FEF2F2', color: '#991B1B' }}>
             Decision engine did not return a valid result. Please check the API payload.
+          </div>
+        )}
+
+        {submitWarning && (
+          <div style={{ padding: '14px 16px', borderRadius: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: 14, lineHeight: 1.5 }}>
+            {submitWarning}
           </div>
         )}
 
