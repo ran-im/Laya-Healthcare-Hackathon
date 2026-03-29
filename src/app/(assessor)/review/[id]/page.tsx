@@ -74,7 +74,7 @@ function formatScoreLabel(key: string) {
 }
 
 function splitExplanationItems(text: string) {
-  return text
+  const rawItems = text
     .split('|')
     .map((part) => part.trim())
     .filter(Boolean)
@@ -89,6 +89,22 @@ function splitExplanationItems(text: string) {
 
       return [part]
     })
+
+  const mergedItems: string[] = []
+  for (const item of rawItems) {
+    const previous = mergedItems[mergedItems.length - 1]
+    if (
+      previous &&
+      /^[A-Z]$/.test(previous) &&
+      /^[A-Z]{2,5}-\d{3}\b/.test(item)
+    ) {
+      mergedItems[mergedItems.length - 1] = `${previous}${item}`
+    } else {
+      mergedItems.push(item)
+    }
+  }
+
+  return mergedItems
 }
 
 function ExplanationList({ text }: { text: string }) {
