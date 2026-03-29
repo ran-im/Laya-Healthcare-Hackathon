@@ -168,7 +168,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           .from('claim-documents')
           .getPublicUrl(filePath)
 
-        await supabase.from('claim_documents').insert({
+        const { error: insertErr } = await supabase.from('claim_documents').insert({
           claim_id: claim.id,
           document_type: 'Additional Information',
           file_name: file.name,
@@ -177,6 +177,8 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           file_size: file.size,
           mime_type: file.type,
         })
+
+        if (insertErr) throw insertErr
 
         uploadedDocs.push({
           name: file.name,
@@ -188,46 +190,31 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
         })
       }
 
-      const updatedDecisionResult: HybridDecisionResult = {
-        claim_reference: engine?.claim_reference ?? claim.claim_id,
-        decision: engine?.decision ?? claim.status,
-        final_decision: engine?.final_decision ?? engine?.decision ?? claim.status,
-        decision_source: engine?.decision_source ?? 'rules',
-        final_display_summary: engine?.final_display_summary ?? claim.ai_decision_reason ?? '',
-        member_decision_summary: engine?.member_decision_summary ?? engine?.final_display_summary ?? '',
-        member_explanation_llm: engine?.member_explanation_llm ?? '',
-        llm_decision: engine?.llm_decision ?? engine?.final_decision ?? engine?.decision ?? claim.status,
-        llm_confidence: engine?.llm_confidence ?? 0,
-        triggered_rules_summary: engine?.triggered_rules_summary ?? [],
-        ...(engine ?? {}),
-        info_request: {
-          ...(infoRequest ?? {
-            status: 'PENDING',
-            requested_documents: [],
-            allow_additional_upload: true,
-          }),
-          status: 'SUBMITTED',
-        },
-        additional_documents: [...additionalDocuments, ...uploadedDocs],
+      const res = await fetch('/api/claims/additional-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claimId: claim.id,
+          uploadedDocs,
+        }),
+      })
+
+      const result = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(result?.error || 'Could not update claim after uploading documents')
       }
 
-      const { error: updateErr } = await supabase
-        .from('claims')
-        .update({
-          status: 'In Review',
-          decision_result: updatedDecisionResult,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', claim.id)
-
-      if (updateErr) throw updateErr
-
-      setClaim((prev: any) => prev ? { ...prev, status: 'In Review', decision_result: updatedDecisionResult } : prev)
+      setClaim((prev: any) => prev ? { ...prev, ...result.claim } : prev)
       setAdditionalFiles([])
       setUploadMessage('Additional documents uploaded successfully. Your claim is back in review.')
     } catch (uploadErr) {
-      console.error(uploadErr)
-      setUploadMessage('Could not upload additional documents. Please try again.')
+      console.error('Additional document upload failed:', uploadErr)
+      setUploadMessage(
+        uploadErr instanceof Error
+          ? uploadErr.message
+          : 'Could not upload additional documents. Please try again.'
+      )
     } finally {
       setUploading(false)
     }
