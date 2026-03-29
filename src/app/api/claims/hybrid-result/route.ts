@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { claimId, newClaimId, hybridDecision } = await request.json()
+    const { claimId, newClaimId, hybridDecision, accountHolderName, iban, bic } = await request.json()
 
     if (!claimId || !hybridDecision) {
       return NextResponse.json({ error: 'Missing claimId or hybridDecision' }, { status: 400 })
@@ -70,6 +70,9 @@ export async function POST(request: Request) {
 
     const extendedClaimUpdate = {
       ...coreClaimUpdate,
+      account_holder_name: accountHolderName ?? typedDecision.submitted_claim_input?.account_holder_name ?? null,
+      iban: iban ?? typedDecision.submitted_claim_input?.iban ?? null,
+      bic: bic ?? typedDecision.submitted_claim_input?.bic_swift ?? typedDecision.submitted_claim_input?.bic ?? null,
       claim_reference: typedDecision.claim_reference ?? newClaimId ?? null,
       decision: typedDecision.decision ?? null,
       final_decision: finalDecision,

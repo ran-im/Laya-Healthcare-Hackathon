@@ -563,6 +563,9 @@ export default function SubmitClaimPage() {
           currency: form.currency,
           member_already_paid: form.memberAlreadyPaid,
           reimbursement_type: form.reimbursementType,
+          account_holder_name: normalizedAccountHolderName,
+          iban: normalizedIban,
+          bic: normalizedBic,
           // user answers
           is_accident_or_injury: form.isAccidentOrInjury,
           is_pre_existing: form.isPreExisting,
@@ -671,6 +674,9 @@ try {
       claimId: claim.id,
       newClaimId,
       hybridDecision,
+      accountHolderName: normalizedAccountHolderName,
+      iban: normalizedIban,
+      bic: normalizedBic,
     }),
   })
 
