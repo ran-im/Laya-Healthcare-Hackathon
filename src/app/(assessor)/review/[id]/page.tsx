@@ -388,6 +388,19 @@ export default function AIReviewPage() {
   const policySources = evidenceUsed.filter((e) =>
     ['policy', 'policy_chunk', 'benefit_table', 'schedule_of_benefits'].includes(String(e?.source ?? '').toLowerCase())
   )
+  const scorecard = engine?.scorecard as
+    | {
+        fraud_score?: number
+        complexity_score?: number
+        anomaly_score?: number
+      }
+    | undefined
+  const resolvedFraudScore =
+    typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : (claim?.fraud_score ?? 0)
+  const resolvedComplexityScore =
+    typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : (claim?.complexity_score ?? 0)
+  const resolvedAnomalyScore =
+    typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : (claim?.anomaly_score ?? 0)
   const finalDecision =
     engine?.final_decision ??
     (engine?.decision_source === 'llm' && engine?.llm_decision
@@ -815,8 +828,8 @@ export default function AIReviewPage() {
     </div>
   )
 
-  const fs = scoreColor(Math.round((claim.fraud_score ?? 0) * 100))
-  const cs = scoreColor(Math.round((claim.complexity_score ?? 0) * 100))
+  const fs = scoreColor(Math.round(resolvedFraudScore * 100))
+  const cs = scoreColor(Math.round(resolvedComplexityScore * 100))
 
   function RuleSection({
     title,
@@ -1027,10 +1040,10 @@ export default function AIReviewPage() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px' }}>
               {[
-                { label:'Fraud Score',      value: Math.round((claim.fraud_score ?? 0) * 100),      style: fs },
-                { label:'Complexity Score', value: Math.round((claim.complexity_score ?? 0) * 100),  style: cs },
-                { label:'Anomaly Score',    value: Math.round((claim.anomaly_score ?? 0) * 100),
-                  style: scoreColor(Math.round((claim.anomaly_score ?? 0) * 100)) },
+                { label:'Fraud Score',      value: Math.round(resolvedFraudScore * 100),      style: fs },
+                { label:'Complexity Score', value: Math.round(resolvedComplexityScore * 100),  style: cs },
+                { label:'Anomaly Score',    value: Math.round(resolvedAnomalyScore * 100),
+                  style: scoreColor(Math.round(resolvedAnomalyScore * 100)) },
               ].map(score => (
                 <div key={score.label} style={{ padding:'16px', borderRadius:'12px',
                                                 background: score.style.bg, textAlign:'center' }}>

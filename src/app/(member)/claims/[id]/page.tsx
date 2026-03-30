@@ -182,9 +182,17 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
   )
 
   const status = STATUS_STYLE[claim.status] || STATUS_STYLE['Submitted']
-  const fraudPct = Math.round((claim.fraud_score || 0) * 100)
-  const complexPct = Math.round((claim.complexity_score || 0) * 100)
   const engine = claim?.decision_result as HybridDecisionResult | null
+  const scorecard = engine?.scorecard as
+    | {
+        fraud_score?: number
+        complexity_score?: number
+        anomaly_score?: number
+      }
+    | undefined
+  const fraudPct = Math.round(((typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : claim.fraud_score) || 0) * 100)
+  const complexPct = Math.round(((typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : claim.complexity_score) || 0) * 100)
+  const anomalyPct = Math.round(((typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : claim.anomaly_score) || 0) * 100)
   const memberSummary =
     engine?.final_display_summary ??
     engine?.member_decision_summary ??
@@ -508,7 +516,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
               {[
                 { label: 'Fraud Score', value: fraudPct, color: fraudPct > 50 ? C.rose : fraudPct > 25 ? C.gold : '#059669' },
                 { label: 'Complexity', value: complexPct, color: complexPct > 70 ? C.rose : complexPct > 40 ? C.gold : '#059669' },
-                { label: 'Anomaly', value: Math.round((claim.anomaly_score || 0) * 100), color: '#6B7280' },
+                { label: 'Anomaly', value: anomalyPct, color: '#6B7280' },
               ].map(score => (
                 <div key={score.label} style={{ background: C.warm, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: 800, color: score.color }}>{score.value}%</div>
