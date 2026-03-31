@@ -74,22 +74,37 @@ export async function POST(request: Request) {
           : `Decision: NEEDS_INFO. ${infoRequest?.message || 'Additional information requested by assessor.'}`,
     }
 
-    const updates: Record<string, unknown> = {
+    const coreUpdates: Record<string, unknown> = {
       status: nextStatus,
       routing: nextRouting,
       engine_status: normalizedDecision,
       ai_decision: normalizedDecision,
+      updated_at: new Date().toISOString(),
+    }
+
+    const minimalUpdates: Record<string, unknown> = {
+      status: nextStatus,
+      routing: nextRouting,
+      decision_result: nextDecisionResult,
+      updated_at: new Date().toISOString(),
+    }
+
+    const extendedUpdates: Record<string, unknown> = {
+      ...coreUpdates,
       decision: normalizedDecision,
       final_decision: normalizedDecision,
       decision_source: 'assessor_override',
-      updated_at: new Date().toISOString(),
     }
 
     if (decision === 'approve') {
       if (amount) {
-        updates.approved_amount = parseFloat(amount)
+        coreUpdates.approved_amount = parseFloat(amount)
+        extendedUpdates.approved_amount = parseFloat(amount)
+        minimalUpdates.approved_amount = parseFloat(amount)
       }
-      updates.rejection_reason = null
+      coreUpdates.rejection_reason = null
+      extendedUpdates.rejection_reason = null
+      minimalUpdates.rejection_reason = null
       nextDecisionResult = {
         ...nextDecisionResult,
         info_request: currentDecisionResult.info_request
@@ -99,7 +114,9 @@ export async function POST(request: Request) {
     }
 
     if (decision === 'reject') {
-      updates.rejection_reason = reason ?? null
+      coreUpdates.rejection_reason = reason ?? null
+      extendedUpdates.rejection_reason = reason ?? null
+      minimalUpdates.rejection_reason = reason ?? null
       nextDecisionResult = {
         ...nextDecisionResult,
         info_request: currentDecisionResult.info_request
@@ -122,21 +139,47 @@ export async function POST(request: Request) {
         ...nextDecisionResult,
         info_request: normalizedInfoRequest,
       }
-      updates.missing_documents = normalizedInfoRequest.requested_documents
-      updates.missing_information = normalizedInfoRequest.message
+      coreUpdates.missing_documents = normalizedInfoRequest.requested_documents
+      coreUpdates.missing_information = normalizedInfoRequest.message
         ? [normalizedInfoRequest.message]
         : currentDecisionResult.missing_information ?? []
+      extendedUpdates.missing_documents = coreUpdates.missing_documents
+      extendedUpdates.missing_information = coreUpdates.missing_information
+      minimalUpdates.missing_documents = coreUpdates.missing_documents
+      minimalUpdates.missing_information = coreUpdates.missing_information
     }
 
-    updates.decision_result = nextDecisionResult
+    coreUpdates.decision_result = nextDecisionResult
+    extendedUpdates.decision_result = nextDecisionResult
+    minimalUpdates.decision_result = nextDecisionResult
 
     const { error: updateError } = await supabaseAdmin
       .from('claims')
-      .update(updates)
+      .update(extendedUpdates)
       .eq('id', claimId)
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      console.warn('Extended claim decision update failed:', updateError.message)
+      const { error: fallbackUpdateError } = await supabaseAdmin
+        .from('claims')
+        .update(coreUpdates)
+        .eq('id', claimId)
+
+      if (fallbackUpdateError) {
+        console.warn('Core claim decision update failed:', fallbackUpdateError.message)
+        const { error: minimalUpdateError } = await supabaseAdmin
+          .from('claims')
+          .update(minimalUpdates)
+          .eq('id', claimId)
+
+        if (minimalUpdateError) {
+          return NextResponse.json({ error: minimalUpdateError.message }, { status: 500 })
+        }
+
+        warnings.push(`Claim saved with minimal fields only: ${fallbackUpdateError.message}`)
+      } else {
+        warnings.push(`Claim saved without optional decision columns: ${updateError.message}`)
+      }
     }
 
     const note =
