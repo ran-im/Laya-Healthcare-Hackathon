@@ -72,6 +72,18 @@ function timeAgo(d: string) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+function resolvedDecision(claim: Claim) {
+  return claim.decision_result?.final_decision ??
+    claim.decision_result?.decision ??
+    claim.ai_decision ??
+    null
+}
+
+function effectiveStatus(claim: Claim) {
+  const decision = resolvedDecision(claim)
+  return decision ? mapDecisionToUiStatus(decision) : claim.status
+}
+
 export default function AssessorDashboardPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -87,17 +99,6 @@ export default function AssessorDashboardPage() {
   const [routingF, setRoutingF]   = useState('all')
   const [priorityF, setPriorityF] = useState('all')
   const [activeTab, setActiveTab] = useState<'queue'|'stats'>('queue')
-
-  const resolvedDecision = (claim: Claim) =>
-    claim.decision_result?.final_decision ??
-    claim.decision_result?.decision ??
-    claim.ai_decision ??
-    null
-
-  const effectiveStatus = (claim: Claim) => {
-    const decision = resolvedDecision(claim)
-    return decision ? mapDecisionToUiStatus(decision) : claim.status
-  }
 
   const isApprovedClaim = (claim: Claim) =>
     ['Approved', 'Paid'].includes(effectiveStatus(claim)) || resolvedDecision(claim) === 'APPROVE'
@@ -174,7 +175,12 @@ export default function AssessorDashboardPage() {
         .order('created_at', { ascending: false })
         .limit(100)
 
-      if (data) setClaims(data)
+      if (data) {
+        setClaims(data.map((claim) => ({
+          ...claim,
+          status: effectiveStatus(claim as Claim),
+        })))
+      }
     } finally { setLoading(false) }
   }
 
