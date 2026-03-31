@@ -130,7 +130,7 @@ export default function AssessorDashboardPage() {
   useEffect(() => { loadData() }, [])
 
   useEffect(() => {
-    let r = [...claims]
+    let r = claims.filter(c => !['Approved', 'Paid', 'Rejected'].includes(effectiveStatus(c)))
     if (search)          r = r.filter(c =>
       c.claim_id.toLowerCase().includes(search.toLowerCase()) ||
       c.provider_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -362,9 +362,9 @@ export default function AssessorDashboardPage() {
                        fontSize:'13px', color:'#374151', background:'#F9FAFB',
                        outline:'none', cursor:'pointer', appearance:'none' }}>
               <option value="all">All Routing</option>
-              <option value="manual">Manual Review</option>
-              <option value="fraud">Fraud Review</option>
-              <option value="auto_approve">Auto-Approve</option>
+              <option value="manual_review">Manual Review</option>
+              <option value="fraud_investigation">Fraud Review</option>
+              <option value="auto_approved">Auto-Approve</option>
             </select>
             <ChevronDown size={13} style={{ position:'absolute', right:'8px', top:'50%',
                                             transform:'translateY(-50%)', color:'#9CA3AF', pointerEvents:'none' }} />
