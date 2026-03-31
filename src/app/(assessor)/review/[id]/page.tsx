@@ -310,6 +310,22 @@ function MarkdownMessage({ text }: { text: string }) {
   )
 }
 
+function needsFullHybridResult(decisionResult: HybridDecisionResult | null | undefined) {
+  if (!decisionResult) return true
+
+  const scorecard = decisionResult.scorecard as Record<string, unknown> | null | undefined
+  const hasRichScorecard =
+    !!scorecard &&
+    (
+      'amount_baseline_eur' in scorecard ||
+      'auto_approve_probability' in scorecard ||
+      'provider_risk_score' in scorecard ||
+      'historical_member_claim_count' in scorecard
+    )
+
+  return !hasRichScorecard
+}
+
 function buildAssistantSummary(engine: HybridDecisionResult | null, claim: Claim | null) {
   if (!engine) return null
 
@@ -552,7 +568,7 @@ export default function AIReviewPage() {
         const normalizedProfile = profileData ?? undefined
 
         let hydratedClaim: Claim = { ...claimData, profiles: normalizedProfile }
-        if (!hydratedClaim.decision_result) {
+        if (needsFullHybridResult(hydratedClaim.decision_result ?? null)) {
           const evaluatedDecision = await evaluateHybridDecision(hydratedClaim, normalizedProfile, docsData ?? [])
           if (evaluatedDecision) {
             hydratedClaim = { ...hydratedClaim, decision_result: evaluatedDecision }
