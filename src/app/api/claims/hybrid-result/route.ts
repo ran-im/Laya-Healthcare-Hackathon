@@ -44,7 +44,6 @@ export async function POST(request: Request) {
     )
 
     const typedDecision = hybridDecision as HybridDecisionResult
-    const warnings: string[] = []
     const finalDecision = typedDecision.final_decision ?? typedDecision.decision
     const uiStatus = mapDecisionToUiStatus(finalDecision)
     const routing = mapDecisionToRouting(finalDecision)
@@ -66,13 +65,6 @@ export async function POST(request: Request) {
       fraud_score: typeof scorecard?.fraud_score === 'number' ? scorecard.fraud_score : null,
       complexity_score: typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : null,
       anomaly_score: typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : null,
-      updated_at: new Date().toISOString(),
-    }
-
-    const minimalClaimUpdate = {
-      status: uiStatus,
-      routing,
-      decision_result: typedDecision,
       updated_at: new Date().toISOString(),
     }
 
@@ -101,27 +93,13 @@ export async function POST(request: Request) {
       .eq('id', claim.id)
 
     if (updateError) {
-      console.warn('Extended hybrid-result update failed:', updateError.message)
       const { error: fallbackUpdateError } = await admin
         .from('claims')
         .update(coreClaimUpdate)
         .eq('id', claim.id)
 
       if (fallbackUpdateError) {
-        console.warn('Core hybrid-result update failed:', fallbackUpdateError.message)
-        const { error: minimalUpdateError } = await admin
-          .from('claims')
-          .update(minimalClaimUpdate)
-          .eq('id', claim.id)
-
-        if (minimalUpdateError) {
-          console.error('Minimal hybrid-result update failed:', minimalUpdateError.message)
-          return NextResponse.json({ error: minimalUpdateError.message }, { status: 500 })
-        }
-
-        warnings.push(`Claims row saved with minimal fields only: ${fallbackUpdateError.message}`)
-      } else {
-        warnings.push(`Claims row saved without optional columns: ${updateError.message}`)
+        return NextResponse.json({ error: fallbackUpdateError.message }, { status: 500 })
       }
     }
 
@@ -136,21 +114,12 @@ export async function POST(request: Request) {
       message: r.claim_explanation,
     }))
 
-    const { error: deleteRuleRowsError } = await admin
-      .from('claim_rule_results')
-      .delete()
-      .eq('claim_id', claim.id)
-
-    if (deleteRuleRowsError) {
-      console.warn('Could not clear prior rule rows:', deleteRuleRowsError.message)
-      warnings.push(`Could not clear prior rule rows: ${deleteRuleRowsError.message}`)
-    }
+    await admin.from('claim_rule_results').delete().eq('claim_id', claim.id)
 
     if (ruleRows.length > 0) {
       const { error: ruleInsertError } = await admin.from('claim_rule_results').insert(ruleRows)
       if (ruleInsertError) {
-        console.warn('Could not save rule rows:', ruleInsertError.message)
-        warnings.push(`Could not save rule rows: ${ruleInsertError.message}`)
+        return NextResponse.json({ error: ruleInsertError.message }, { status: 500 })
       }
     }
 
@@ -164,13 +133,11 @@ export async function POST(request: Request) {
     })
 
     if (historyError) {
-      console.warn('Could not save claim status history:', historyError.message)
-      warnings.push(`Could not save claim status history: ${historyError.message}`)
+      return NextResponse.json({ error: historyError.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, status: uiStatus, routing, warnings })
+    return NextResponse.json({ success: true, status: uiStatus, routing })
   } catch (error) {
-    console.error('Hybrid-result route failed:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unexpected error' },
       { status: 500 }
