@@ -22,6 +22,8 @@ interface Claim {
   treatment_country: string; is_pre_authorized: boolean
   fraud_score: number | null; complexity_score: number | null; anomaly_score: number | null
   ai_summary: string | null; ai_recommendation: string | null
+  ai_decision?: string | null
+  engine_status?: string | null
   assessor_notes: string | null; rejection_reason: string | null
   submitted_at: string; updated_at: string
   decision_result?: HybridDecisionResult
@@ -364,6 +366,7 @@ export default function AIReviewPage() {
   const [assessorNotes, setAssessorNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [requestedDocs, setRequestedDocs] = useState<string[]>([])
+  const [showStatusOverride, setShowStatusOverride] = useState(false)
 
   // Rule Explanation
   const [ruleExplanation, setRuleExplanation] = useState('')
@@ -418,6 +421,45 @@ export default function AIReviewPage() {
   ]))
 
   useEffect(() => { loadData() }, [routeId])
+  useEffect(() => {
+    async function syncDerivedStatus() {
+      if (!claim?.id || !finalDecision) return
+
+      const nextStatus = mapDecisionToUiStatus(finalDecision)
+      const nextRouting = mapDecisionToRouting(finalDecision)
+      const updates: Record<string, unknown> = {}
+
+      if (claim.status !== nextStatus) {
+        updates.status = nextStatus
+      }
+      if (claim.routing !== nextRouting) {
+        updates.routing = nextRouting
+      }
+      if (claim.ai_decision !== finalDecision) {
+        updates.ai_decision = finalDecision
+      }
+      if (claim.engine_status !== finalDecision) {
+        updates.engine_status = finalDecision
+      }
+
+      if (Object.keys(updates).length === 0) return
+
+      updates.updated_at = new Date().toISOString()
+
+      const { error } = await supabase
+        .from('claims')
+        .update(updates)
+        .eq('id', claim.id)
+
+      if (!error) {
+        setClaim((prev) => prev ? { ...prev, ...updates } as Claim : prev)
+      } else {
+        console.warn('Could not sync derived claim status:', error.message)
+      }
+    }
+
+    syncDerivedStatus()
+  }, [claim?.id, claim?.status, claim?.routing, claim?.ai_decision, claim?.engine_status, finalDecision, supabase])
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat])
@@ -1563,12 +1605,64 @@ export default function AIReviewPage() {
                 )}
               </>
             )}
-          {!['Approved','Rejected','Paid'].includes(effectiveStatus) && (
+          {['Approved','Rejected','Paid'].includes(effectiveStatus) && !showStatusOverride && (
             <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                           boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
-              <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 16px 0' }}>
-                Issue Decision
-              </h3>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px', flexWrap:'wrap' }}>
+                <div>
+                  <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 6px 0' }}>
+                    Status Locked By Current Decision
+                  </h3>
+                  <p style={{ margin:0, fontSize:'13px', color:'#6B7280', lineHeight:1.5 }}>
+                    This claim is currently marked as <strong>{effectiveStatus}</strong>. If you found an issue and need to override it, use the button on the right.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowStatusOverride(true)}
+                  style={{
+                    padding:'10px 16px',
+                    borderRadius:'10px',
+                    border:'1px solid #E5E7EB',
+                    background:'#F9FAFB',
+                    color:'#111827',
+                    fontSize:'13px',
+                    fontWeight:600,
+                    cursor:'pointer',
+                  }}
+                >
+                  Update Status
+                </button>
+              </div>
+            </div>
+          )}
+          {(!['Approved','Rejected','Paid'].includes(effectiveStatus) || showStatusOverride) && (
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                          boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', margin:'0 0 16px 0' }}>
+                <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:0 }}>
+                  Issue Decision
+                </h3>
+                {showStatusOverride && (
+                  <button
+                    onClick={() => {
+                      setShowStatusOverride(false)
+                      setDecision(null)
+                    }}
+                    style={{
+                      padding:'8px 12px',
+                      borderRadius:'10px',
+                      border:'1px solid #E5E7EB',
+                      background:'white',
+                      color:'#6B7280',
+                      fontSize:'12px',
+                      fontWeight:600,
+                      cursor:'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
 
               {/* Decision buttons */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'16px' }}>
