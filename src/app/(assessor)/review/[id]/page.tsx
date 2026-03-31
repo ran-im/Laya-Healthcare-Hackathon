@@ -758,8 +758,6 @@ export default function AIReviewPage() {
     setDeciding(true)
     setDecisionMessage('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-
       const res = await fetch('/api/claims/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -770,7 +768,6 @@ export default function AIReviewPage() {
           reason: decision === 'reject' ? rejectionReason : undefined,
           infoRequest: decision === 'info'
             ? {
-                requested_by: user?.id ?? null,
                 requested_at: new Date().toISOString(),
                 message: assessorNotes || 'Please provide the requested documents so we can continue reviewing your claim.',
                 requested_documents: requestedDocs,
@@ -783,52 +780,21 @@ export default function AIReviewPage() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Could not update claim decision')
 
       const statusMap = { approve: 'Approved', reject: 'Rejected', info: 'Info Required' } as const
+      const updatedStatus = data.status ?? statusMap[decision]
+      const updatedRouting = data.routing ?? mapDecisionToRouting(data.normalizedDecision ?? finalDecision)
+      const updatedEngineStatus = data.normalizedDecision ?? finalDecision ?? null
+
       setClaim((prev) => prev ? {
         ...prev,
-        status: statusMap[decision],
+        status: updatedStatus,
+        routing: updatedRouting,
+        ai_decision: updatedEngineStatus,
+        engine_status: updatedEngineStatus,
         updated_at: new Date().toISOString(),
       } : prev)
 
-      // Append to claim_status_history
-      try {
-        const { error: historyError } = await supabase.from('claim_status_history').insert({
-          claim_id: claim.id,
-          status: statusMap[decision],
-          engine_status: null,
-          actor_id: user?.id,
-          actor_role: 'assessor',
-          note: decision === 'info'
-            ? assessorNotes || `Requested documents: ${requestedDocs.join(', ')}`
-            : assessorNotes || (decision === 'reject' ? rejectionReason : undefined),
-        })
-
-        if (historyError) {
-          console.warn('Could not append claim status history:', historyError.message)
-        }
-      } catch (historyErr) {
-        console.warn('Could not append claim status history:', historyErr)
-      }
-
-      // Notification
-      try {
-        const { error: notificationError } = await supabase.from('notifications').insert({
-          user_id: claim.profiles ? (claim as any).member_id : null,
-          claim_id: claim.id,
-          type: 'status_update',
-          title: `Claim ${decision === 'approve' ? 'Approved' : decision === 'reject' ? 'Rejected' : 'Info Required'}`,
-          message: decision === 'approve'
-            ? `Your claim ${claim.claim_id} has been approved for ${fmt(Number(approvedAmt))}.`
-            : decision === 'reject'
-            ? `Your claim ${claim.claim_id} has been rejected. ${rejectionReason}`
-            : `Additional information required for claim ${claim.claim_id}. ${assessorNotes || ''}`.trim(),
-          action_url: `/claims/${claim.id}`,
-        })
-
-        if (notificationError) {
-          console.warn('Could not create notification:', notificationError.message)
-        }
-      } catch (notificationErr) {
-        console.warn('Could not create notification:', notificationErr)
+      if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+        console.warn('Assessor decision completed with warnings:', data.warnings)
       }
 
       router.push('/assessor-dashboard')
