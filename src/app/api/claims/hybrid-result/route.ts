@@ -71,7 +71,6 @@ export async function POST(request: Request) {
 
     const minimalClaimUpdate = {
       status: uiStatus,
-      routing,
       decision_result: typedDecision,
       updated_at: new Date().toISOString(),
     }

@@ -84,7 +84,6 @@ export async function POST(request: Request) {
 
     const minimalUpdates: Record<string, unknown> = {
       status: nextStatus,
-      routing: nextRouting,
       decision_result: nextDecisionResult,
       updated_at: new Date().toISOString(),
     }
