@@ -87,14 +87,36 @@ export default function AssessorDashboardPage() {
   const [priorityF, setPriorityF] = useState('all')
   const [activeTab, setActiveTab] = useState<'queue'|'stats'>('queue')
 
+  const resolvedDecision = (claim: Claim) =>
+    claim.decision_result?.final_decision ??
+    claim.decision_result?.decision ??
+    claim.ai_decision ??
+    null
+
+  const isApprovedClaim = (claim: Claim) =>
+    ['Approved', 'Paid'].includes(claim.status) || resolvedDecision(claim) === 'APPROVE'
+
+  const isRejectedClaim = (claim: Claim) =>
+    claim.status === 'Rejected' || resolvedDecision(claim) === 'REJECT'
+
+  const isPendingClaim = (claim: Claim) =>
+    !isApprovedClaim(claim) &&
+    !isRejectedClaim(claim) &&
+    ['Submitted', 'In Review', 'Info Required'].includes(claim.status)
+
   const stats: Stats = {
     total:           claims.length,
-    pending:         claims.filter(c => ['Submitted','In Review'].includes(c.status)).length,
-    approved:        claims.filter(c => ['Approved','Paid'].includes(c.status)).length,
-    rejected:        claims.filter(c => c.status === 'Rejected').length,
+    pending:         claims.filter(isPendingClaim).length,
+    approved:        claims.filter(isApprovedClaim).length,
+    rejected:        claims.filter(isRejectedClaim).length,
     avgProcessTime:  '1.8 days',
     autoApproveRate: claims.length
-      ? Math.round(claims.filter(c => c.routing === 'auto_approve').length / claims.length * 100)
+      ? Math.round(
+          claims.filter(c =>
+            c.routing === 'auto_approved' ||
+            (resolvedDecision(c) === 'APPROVE' && c.decision_result?.decision_source === 'rules')
+          ).length / claims.length * 100
+        )
       : 0,
   }
 
