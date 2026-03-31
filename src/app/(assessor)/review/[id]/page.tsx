@@ -410,6 +410,7 @@ export default function AIReviewPage() {
     typeof engine?.conflicts_with_rule_engine === 'boolean'
       ? engine.conflicts_with_rule_engine
       : engine?.decision_source === 'llm' && !!engine?.llm_decision && !!engine?.decision && engine.llm_decision !== engine.decision
+  const effectiveStatus = finalDecision ? mapDecisionToUiStatus(finalDecision) : claim?.status ?? 'Submitted'
   const currentInfoRequest = engine?.info_request ?? null
   const suggestedRequestedDocs = Array.from(new Set([
     ...(engine?.missing_documents ?? []),
@@ -931,13 +932,13 @@ export default function AIReviewPage() {
 
           {/* Status */}
           <span style={{ fontSize:'12px', fontWeight:600, padding:'5px 12px', borderRadius:'999px',
-                         background: claim.status === 'Approved' ? '#ECFDF5' :
-                                     claim.status === 'Rejected' ? '#FEF2F2' :
-                                     claim.status === 'In Review' ? '#FFFBEB' : '#EFF6FF',
-                         color:      claim.status === 'Approved' ? '#059669' :
-                                     claim.status === 'Rejected' ? '#DC2626' :
-                                     claim.status === 'In Review' ? '#D97706' : '#2563EB' }}>
-            {claim.status}
+                         background: effectiveStatus === 'Approved' ? '#ECFDF5' :
+                                     effectiveStatus === 'Rejected' ? '#FEF2F2' :
+                                     effectiveStatus === 'In Review' ? '#FFFBEB' : '#EFF6FF',
+                         color:      effectiveStatus === 'Approved' ? '#059669' :
+                                     effectiveStatus === 'Rejected' ? '#DC2626' :
+                                     effectiveStatus === 'In Review' ? '#D97706' : '#2563EB' }}>
+            {effectiveStatus}
           </span>
         </div>
       </nav>
@@ -1562,7 +1563,7 @@ export default function AIReviewPage() {
                 )}
               </>
             )}
-          {!['Approved','Rejected','Paid'].includes(claim.status) && (
+          {!['Approved','Rejected','Paid'].includes(effectiveStatus) && (
             <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                           boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
               <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 16px 0' }}>

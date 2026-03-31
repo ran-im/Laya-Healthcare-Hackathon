@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { mapDecisionToUiStatus } from '@/lib/claim-status'
 import {
   Shield, LogOut, Clock, CheckCircle2, XCircle,
   AlertCircle, Activity, ChevronRight, Search,
@@ -93,16 +94,21 @@ export default function AssessorDashboardPage() {
     claim.ai_decision ??
     null
 
+  const effectiveStatus = (claim: Claim) => {
+    const decision = resolvedDecision(claim)
+    return decision ? mapDecisionToUiStatus(decision) : claim.status
+  }
+
   const isApprovedClaim = (claim: Claim) =>
-    ['Approved', 'Paid'].includes(claim.status) || resolvedDecision(claim) === 'APPROVE'
+    ['Approved', 'Paid'].includes(effectiveStatus(claim)) || resolvedDecision(claim) === 'APPROVE'
 
   const isRejectedClaim = (claim: Claim) =>
-    claim.status === 'Rejected' || resolvedDecision(claim) === 'REJECT'
+    effectiveStatus(claim) === 'Rejected' || resolvedDecision(claim) === 'REJECT'
 
   const isPendingClaim = (claim: Claim) =>
     !isApprovedClaim(claim) &&
     !isRejectedClaim(claim) &&
-    ['Submitted', 'In Review', 'Info Required'].includes(claim.status)
+    ['Submitted', 'In Review', 'Info Required'].includes(effectiveStatus(claim))
 
   const stats: Stats = {
     total:           claims.length,
@@ -409,6 +415,7 @@ export default function AssessorDashboardPage() {
             </div>
           ) : (
             filtered.map((claim, i) => {
+              const displayStatus = effectiveStatus(claim)
               const rs  = routingStyle(claim.routing)
               const ps  = priorityStyle(claim.priority || 'normal')
               const fraudScore     = Math.round((claim.fraud_score     ?? 0) * 100)
@@ -559,18 +566,18 @@ export default function AssessorDashboardPage() {
                   {/* Status */}
                   <div>
                     <span style={{ fontSize:'11px', fontWeight:600, padding:'3px 8px', borderRadius:'999px',
-                                   background: claim.status === 'Submitted' ? '#EFF6FF' :
-                                               claim.status === 'In Review' ? '#FFFBEB' :
-                                               claim.status === 'Approved'  ? '#ECFDF5' :
-                                               claim.status === 'Paid'      ? '#F2FAF9' :
-                                               claim.status === 'Rejected'  ? '#FEF2F2' : '#F3F4F6',
-                                   color:     claim.status === 'Submitted' ? '#2563EB' :
-                                               claim.status === 'In Review' ? '#D97706' :
-                                               claim.status === 'Approved'  ? '#059669' :
-                                               claim.status === 'Paid'      ? '#00A89D' :
-                                               claim.status === 'Rejected'  ? '#DC2626' : '#6B7280',
+                                   background: displayStatus === 'Submitted' ? '#EFF6FF' :
+                                               displayStatus === 'In Review' ? '#FFFBEB' :
+                                               displayStatus === 'Approved'  ? '#ECFDF5' :
+                                               displayStatus === 'Paid'      ? '#F2FAF9' :
+                                               displayStatus === 'Rejected'  ? '#FEF2F2' : '#F3F4F6',
+                                   color:     displayStatus === 'Submitted' ? '#2563EB' :
+                                               displayStatus === 'In Review' ? '#D97706' :
+                                               displayStatus === 'Approved'  ? '#059669' :
+                                               displayStatus === 'Paid'      ? '#00A89D' :
+                                               displayStatus === 'Rejected'  ? '#DC2626' : '#6B7280',
                     }}>
-                      {claim.status}
+                      {displayStatus}
                     </span>
                   </div>
 
@@ -584,7 +591,7 @@ export default function AssessorDashboardPage() {
                                display:'flex', alignItems:'center', gap:'4px' }}>
                       <Brain size={12} /> Review
                     </button>
-                    {['Submitted','In Review'].includes(claim.status) && (
+                    {['Submitted','In Review'].includes(displayStatus) && (
                       <>
                         <button onClick={() => quickAction(claim.id, 'approve')}
                           title="Quick Approve"
