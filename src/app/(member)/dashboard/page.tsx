@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { deriveEffectiveClaimStatus } from '@/lib/claim-status'
 import {
   FileText, Plus, Clock, CheckCircle2, XCircle,
   AlertCircle, CreditCard, Bell, ChevronRight,
@@ -21,6 +22,7 @@ interface Claim {
   ai_decision: string | null
   ai_decision_reason: string | null
   ai_payable_amount: number | null
+  decision_result?: { final_decision?: string | null; decision?: string | null } | null
 }
 interface Notification {
   id: string; title: string; message: string
@@ -81,10 +83,14 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
-  const totalClaims    = claims.length
-  const pendingClaims  = claims.filter(c => ['Submitted','In Review'].includes(c.status)).length
-  const approvedClaims = claims.filter(c => ['Approved','Paid'].includes(c.status)).length
-  const totalPaid      = claims.filter(c => c.status === 'Paid').reduce((s, c) => s + c.total_amount, 0)
+  const claimsWithStatus = claims.map((claim) => ({
+    ...claim,
+    displayStatus: deriveEffectiveClaimStatus(claim),
+  }))
+  const totalClaims    = claimsWithStatus.length
+  const pendingClaims  = claimsWithStatus.filter(c => ['Submitted','In Review','Info Required'].includes(c.displayStatus)).length
+  const approvedClaims = claimsWithStatus.filter(c => ['Approved','Paid'].includes(c.displayStatus)).length
+  const totalPaid      = claimsWithStatus.filter(c => c.displayStatus === 'Paid').reduce((s, c) => s + c.total_amount, 0)
   const unread         = notifications.filter(n => !n.is_read).length
 
   if (loading) return (
@@ -141,7 +147,7 @@ export default function DashboardPage() {
               <a href="/claims" style={{ fontSize:'13px', fontWeight:500, color:'#00A89D', display:'flex', alignItems:'center', gap:'4px' }}>View all <ChevronRight size={14} /></a>
             </div>
 
-            {claims.length === 0 ? (
+            {claimsWithStatus.length === 0 ? (
               <div style={{ padding:'60px 20px', textAlign:'center' }}>
                 <div style={{ width:'56px', height:'56px', borderRadius:'16px', background:'#F2FAF9', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
                   <FileText size={24} color="#00A89D" />
@@ -153,8 +159,8 @@ export default function DashboardPage() {
                 </button>
               </div>
             ) : (
-              claims.map((claim, i) => {
-                const sc = statusStyle(claim.status)
+              claimsWithStatus.map((claim, i) => {
+                const sc = statusStyle(claim.displayStatus)
                 return (
                   <div key={claim.id} onClick={() => router.push(`/claims/${claim.id}`)} style={{ display:'flex', alignItems:'center', gap:'14px', padding:'14px 20px', cursor:'pointer', transition:'background 0.15s', borderBottom: i < claims.length - 1 ? '1px solid #F9FAFB' : 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')} onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                     <div style={{ width:'38px', height:'38px', borderRadius:'10px', flexShrink:0, background:'#F2FAF9', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -198,6 +204,11 @@ export default function DashboardPage() {
     Est. {fmt(claim.ai_payable_amount)}
   </span>
 )}
+                      <div style={{ marginTop:'5px' }}>
+                        <span style={{ fontSize:'11px', fontWeight:500, padding:'2px 8px', borderRadius:'999px', background: sc.bg, color: sc.color }}>
+                          {claim.displayStatus}
+                        </span>
+                      </div>
                     </div>
                     <ChevronRight size={15} color="#E5E7EB" />
                   </div>

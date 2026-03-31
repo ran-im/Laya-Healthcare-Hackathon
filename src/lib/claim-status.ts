@@ -45,3 +45,20 @@ export function mapDecisionToRouting(decision?: string): string {
       return 'pending'
   }
 }
+
+export function deriveEffectiveClaimStatus(input: {
+  status?: string | null
+  ai_decision?: string | null
+  decision_result?: {
+    final_decision?: string | null
+    decision?: string | null
+  } | null
+}): UiClaimStatus {
+  const decision =
+    input.decision_result?.final_decision ??
+    input.decision_result?.decision ??
+    input.ai_decision ??
+    null
+
+  return decision ? mapDecisionToUiStatus(decision) : ((input.status as UiClaimStatus) || 'Submitted')
+}

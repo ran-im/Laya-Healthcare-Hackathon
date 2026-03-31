@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { deriveEffectiveClaimStatus } from '@/lib/claim-status'
 import type { AdditionalDocument, HybridDecisionResult, InfoRequest } from '@/types'
 
 const C = { dark: '#003C3A', mid: '#005C58', teal: '#00A89D', warm: '#F2FAF9', gold: '#E8A020', rose: '#E8505B' }
@@ -181,8 +182,9 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
     </div>
   )
 
-  const status = STATUS_STYLE[claim.status] || STATUS_STYLE['Submitted']
   const engine = claim?.decision_result as HybridDecisionResult | null
+  const displayStatus = deriveEffectiveClaimStatus(claim)
+  const status = STATUS_STYLE[displayStatus] || STATUS_STYLE['Submitted']
   const scorecard = engine?.scorecard as
     | {
         fraud_score?: number
@@ -298,7 +300,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <span style={{ background: status.bg, color: status.color, padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 700 }}>
-              {status.icon} {claim.status}
+              {status.icon} {displayStatus}
             </span>
             <div style={{ color: 'white', fontSize: '28px', fontWeight: 800 }}>€{Number(claim.total_amount).toFixed(2)}</div>
             {claim.approved_amount && claim.approved_amount !== claim.total_amount && (
@@ -457,7 +459,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
         )}
 
         {/* Rejection notice (legacy fallback) */}
-        {claim.status === 'Rejected' && !memberSummary && (
+        {displayStatus === 'Rejected' && !memberSummary && (
           <div style={{ background: '#FEF2F2', border: '2px solid #FECACA', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>❌</span>
@@ -469,7 +471,7 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
         )}
 
         {/* Info required notice (legacy fallback) */}
-        {claim.status === 'Info Required' && !engine?.missing_documents?.length && !engine?.missing_information?.length && (
+        {displayStatus === 'Info Required' && !engine?.missing_documents?.length && !engine?.missing_information?.length && (
           <div style={{ background: '#FFF7ED', border: '2px solid #FED7AA', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '20px' }}>⚠️</span>
@@ -535,9 +537,9 @@ export default function ClaimDetailPage({ params }: { params: Promise<{ id: stri
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: C.dark, margin: '0 0 20px', paddingBottom: '12px', borderBottom: '1px solid #F3F4F6' }}>Status Timeline</h2>
           {[
             { status: 'Submitted', date: claim.submitted_at, done: true },
-            { status: 'In Review', date: claim.status !== 'Submitted' ? claim.updated_at : null, done: ['In Review','Approved','Paid','Rejected','Info Required'].includes(claim.status) },
-            { status: 'Decision', date: ['Approved','Paid','Rejected'].includes(claim.status) ? claim.updated_at : null, done: ['Approved','Paid','Rejected'].includes(claim.status) },
-            { status: 'Paid', date: claim.status === 'Paid' ? claim.updated_at : null, done: claim.status === 'Paid' },
+            { status: 'In Review', date: displayStatus !== 'Submitted' ? claim.updated_at : null, done: ['In Review','Approved','Paid','Rejected','Info Required'].includes(displayStatus) },
+            { status: 'Decision', date: ['Approved','Paid','Rejected'].includes(displayStatus) ? claim.updated_at : null, done: ['Approved','Paid','Rejected'].includes(displayStatus) },
+            { status: 'Paid', date: displayStatus === 'Paid' ? claim.updated_at : null, done: displayStatus === 'Paid' },
           ].map((step, i) => (
             <div key={i} style={{ display: 'flex', gap: '16px', marginBottom: i < 3 ? '16px' : 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

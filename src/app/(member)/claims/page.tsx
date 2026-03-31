@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { deriveEffectiveClaimStatus } from '@/lib/claim-status'
 import type { HybridDecisionResult } from '@/types'
 import {
   FileText, Plus, Search, Filter, ChevronRight,
@@ -81,7 +82,10 @@ export default function ClaimsPage() {
   useEffect(() => { loadData() }, [])
 
   useEffect(() => {
-    let result = [...claims]
+    let result = [...claims].map((claim) => ({
+      ...claim,
+      status: deriveEffectiveClaimStatus(claim),
+    }))
     if (search)                result = result.filter(c =>
       c.claim_id.toLowerCase().includes(search.toLowerCase()) ||
       c.provider_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -150,9 +154,9 @@ export default function ClaimsPage() {
   // Stats
   const stats = {
     total:    claims.length,
-    pending:  claims.filter(c => ['Submitted','In Review'].includes(c.status)).length,
-    approved: claims.filter(c => ['Approved','Paid'].includes(c.status)).length,
-    paid:     claims.filter(c => c.status === 'Paid').reduce((s,c) => s + c.total_amount, 0),
+    pending:  claims.filter(c => ['Submitted','In Review','Info Required'].includes(deriveEffectiveClaimStatus(c))).length,
+    approved: claims.filter(c => ['Approved','Paid'].includes(deriveEffectiveClaimStatus(c))).length,
+    paid:     claims.filter(c => deriveEffectiveClaimStatus(c) === 'Paid').reduce((s,c) => s + c.total_amount, 0),
   }
 
   if (loading) return (
