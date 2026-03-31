@@ -70,6 +70,7 @@ function scoreColor(s: number) {
 }
 
 function formatScoreLabel(key: string) {
+  if (key === 'amount_baseline_eur') return 'Baseline Price (EUR)'
   return key
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase())
@@ -405,6 +406,15 @@ export default function AIReviewPage() {
     typeof scorecard?.complexity_score === 'number' ? scorecard.complexity_score : (claim?.complexity_score ?? 0)
   const resolvedAnomalyScore =
     typeof scorecard?.anomaly_score === 'number' ? scorecard.anomaly_score : (claim?.anomaly_score ?? 0)
+  const reviewScorecard = {
+    fraud_score: resolvedFraudScore,
+    complexity_score: resolvedComplexityScore,
+    anomaly_score: resolvedAnomalyScore,
+    ...(scorecard ?? {}),
+  }
+  const hasReviewScorecard = Object.values(reviewScorecard).some(
+    (value) => value !== null && value !== undefined
+  )
   const finalDecision =
     engine?.final_decision ??
     (engine?.decision_source === 'llm' && engine?.llm_decision
@@ -1554,50 +1564,51 @@ export default function AIReviewPage() {
                   </div>
                 )}
 
-                {/* Scorecard */}
-                {engine.scorecard && (
-                  <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
-                                boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
-                    <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
-                      Scorecard
-                    </h3>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'12px' }}>
-                      {Object.entries(engine.scorecard).map(([key, value]) => {
-                        const isNumeric = typeof value === 'number'
-                        const isProbability = isNumeric && key !== 'amount_baseline_eur' && value <= 1
-                        const displayValue =
-                          typeof value === 'number'
-                            ? isProbability
-                              ? `${Math.round(value * 100)}%`
-                              : key === 'amount_baseline_eur'
-                              ? `EUR ${value.toFixed(2)}`
-                              : value.toFixed(2)
-                            : String(value)
-
-                        return (
-                          <div
-                            key={key}
-                            style={{
-                              padding:'14px',
-                              borderRadius:'12px',
-                              background:'#F9FAFB',
-                              border:'1px solid #E5E7EB',
-                            }}
-                          >
-                            <div style={{ fontSize:'11px', fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'6px' }}>
-                              {formatScoreLabel(key)}
-                            </div>
-                            <div style={{ fontSize:'18px', fontWeight:700, color:'#111827' }}>
-                              {displayValue}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
               </>
             )}
+          {hasReviewScorecard && (
+            <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
+                          boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>
+              <h3 style={{ fontSize:'14px', fontWeight:600, color:'#111827', margin:'0 0 12px 0' }}>
+                Scorecard
+              </h3>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'12px' }}>
+                {Object.entries(reviewScorecard)
+                  .filter(([, value]) => value !== null && value !== undefined)
+                  .map(([key, value]) => {
+                    const isNumeric = typeof value === 'number'
+                    const isProbability = isNumeric && key !== 'amount_baseline_eur' && value <= 1
+                    const displayValue =
+                      typeof value === 'number'
+                        ? isProbability
+                          ? `${Math.round(value * 100)}%`
+                          : key === 'amount_baseline_eur'
+                          ? `EUR ${value.toFixed(2)}`
+                          : value.toFixed(2)
+                        : String(value)
+
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          padding:'14px',
+                          borderRadius:'12px',
+                          background:'#F9FAFB',
+                          border:'1px solid #E5E7EB',
+                        }}
+                      >
+                        <div style={{ fontSize:'11px', fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'6px' }}>
+                          {formatScoreLabel(key)}
+                        </div>
+                        <div style={{ fontSize:'18px', fontWeight:700, color:'#111827' }}>
+                          {displayValue}
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
           {['Approved','Rejected','Paid'].includes(effectiveStatus) && !showStatusOverride && (
             <div style={{ background:'white', borderRadius:'16px', border:'1px solid #F3F4F6',
                           boxShadow:'0 1px 3px rgba(0,0,0,0.05)', padding:'20px 24px' }}>

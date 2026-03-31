@@ -130,7 +130,7 @@ export default function AssessorDashboardPage() {
   useEffect(() => { loadData() }, [])
 
   useEffect(() => {
-    let r = claims.filter(c => !['Approved', 'Paid', 'Rejected'].includes(effectiveStatus(c)))
+    let r = [...claims]
     if (search)          r = r.filter(c =>
       c.claim_id.toLowerCase().includes(search.toLowerCase()) ||
       c.provider_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -412,7 +412,7 @@ export default function AssessorDashboardPage() {
             <div style={{ padding:'60px 20px', textAlign:'center' }}>
               <Brain size={32} color="#D1D5DB" style={{ margin:'0 auto 12px', display:'block' }} />
               <h3 style={{ fontSize:'15px', fontWeight:600, color:'#374151', margin:'0 0 6px 0' }}>
-                {claims.length === 0 ? 'No claims in queue' : 'No claims match your filters'}
+                {claims.length === 0 ? 'No claims available' : 'No claims match your filters'}
               </h3>
               <p style={{ fontSize:'13px', color:'#9CA3AF', margin:0 }}>
                 {claims.length === 0 ? 'Claims submitted by members will appear here'
